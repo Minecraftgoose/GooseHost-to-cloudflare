@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://host.goose.gs.cn"><img src="front/logo.svg" alt="GooseHost Logo" width="auto"></a>
+  <a href="https://host.goose.gs.cn"><img src="https://host.goose.gs.cn/front/logo.svg" alt="GooseHost Logo" width="auto"></a>
 </p>
 
 <p align="center">
