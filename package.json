@@ -1,0 +1,25 @@
+{
+  "name": "goosehost-worker",
+  "version": "1.0.0",
+  "description": "GooseHost API Worker (CI 构建: esbuild -> worker.js -> Cloudflare)",
+  "main": "worker.js",
+  "scripts": {
+    "build": "esbuild index.js --bundle --format=esm --target=es2022 --outfile=worker.js --log-level=info",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "wrangler dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.1",
+    "fflate": "^0.8.3",
+    "marked": "^18.0.5",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "wrangler": "^3.114.17"
+  }
+}
