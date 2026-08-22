@@ -1,17 +1,14 @@
 name = "gh-site-api-production"
 main = "worker.js"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-07-27"
 
-# 非敏感变量：会随仓库提交，严禁放密钥
 [vars]
 API_URL = "https://host.goose.gs.cn"
 ADMIN_USER_IDS = ""
 
-# KV 命名空间（限流用，id 已固定）
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "89552af87a1248bb81cc77419aeeae07"
 
-# 每 30 分钟清理孤立用户
 [triggers]
 crons = ["*/30 * * * *"]
