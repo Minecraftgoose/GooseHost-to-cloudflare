@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# 同一次只跑一个部署，避免并发覆盖
 concurrency:
   group: deploy-goosehost-worker
   cancel-in-progress: true
