@@ -4,7 +4,7 @@ import { checkRateLimit } from '../utils/rate-limit.js';
 import { jsonResp } from '../utils/response.js';
 import { fetchEmailMap } from '../utils/email-map.js';
 
-const RESET_PAGE = 'https://host.goose.gs.cn/reset-password.html';
+const RESET_PAGE = 'https://goosehost-example.pages.dev/reset-password.html';
 
 export async function handleForgotPassword(request, env, corsHeaders) {
   const rl_ip = await checkRateLimit(request, env, 'forgot_ip');
