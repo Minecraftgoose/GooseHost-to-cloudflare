@@ -1,4 +1,4 @@
-﻿// ===== macOS 开发者计划 =====
+// ===== macOS 开发者计划 =====
 
 import { getUserId } from './utils/jwt.js';
 import { jsonResp } from './utils/response.js';
@@ -9,7 +9,7 @@ const MACOS_API = 'https://dev.macos.goose.gs.cn';
 
 function siteUrl(site) {
   const prefix = site.type === 'md' ? '/md/' : (site.type === 'project' ? '/p/' : '/s/');
-  return 'https://goosehost-example.goose-bai.workers.dev' + prefix + encodeURIComponent(site.name);
+  return 'https://page.goose.gs.cn' + prefix + encodeURIComponent(site.name);
 }
 
 // POST /api/macos/submit - 提交站点到 macOS 开发者计划

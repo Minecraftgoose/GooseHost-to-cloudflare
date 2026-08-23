@@ -1,7 +1,7 @@
 // ===== CORS 配置 =====
 
 const ALLOWED_ORIGINS = [
-  'https://goosehost-example.pages.dev',
+  'https://host.goose.gs.cn',
 ];
 
 function getCorsHeaders(request) {
