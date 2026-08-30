@@ -62,13 +62,13 @@ function rotateKeys(keys) {
 }
 
 /* 构造上游请求体。只放行前端真正需要的字段，避免把奇怪参数透传给模型 */
-function buildBody(model, payload, env) {
+function buildBody(model, payload, env, stream) {
   const maxTokens = Number(env.AI_MAX_TOKENS) || 4096;
   const body = {
     model,
     messages: payload.messages,
     max_tokens: maxTokens,
-    stream: false
+    stream: !!stream
   };
   if (Array.isArray(payload.tools) && payload.tools.length) {
     body.tools = payload.tools;
@@ -76,6 +76,21 @@ function buildBody(model, payload, env) {
   }
   if (typeof payload.temperature === 'number') body.temperature = payload.temperature;
   return body;
+}
+
+/* 流式响应的固定头。X-Accel-Buffering 防反向代理缓冲，否则会攒着不发 */
+function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors) {
+  const h = {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    ...corsHeaders,
+    'X-Copilot-Model': model
+  };
+  if (keyCount > 1) h['X-Copilot-Key'] = `${keyIdx}/${keyCount}`;
+  if (errors.length) h['X-Copilot-Fallback'] = errors.join(' | ');
+  return h;
 }
 
 const MAX_ROUNDS = 1;         // 所有 key 试完算一轮，最多再补一轮
@@ -127,6 +142,7 @@ export async function handleAiChat(request, env, corsHeaders) {
   const base = (env.AI_BASE_URL || DEFAULT_BASE).replace(/\/$/, '');
   const models = modelChain(env);
   const errors = [];   // 只记模型名与状态码，绝不记 key 内容
+  const wantStream = payload.stream === true;   // 前端按需开启，默认仍是非流式
 
   /*
    * 用指定模型把 key 列表整个试一遍。
@@ -145,9 +161,24 @@ export async function handleAiChat(request, env, corsHeaders) {
             'Content-Type': 'application/json',
             Authorization: 'Bearer ' + keys[k]
           },
-          body: JSON.stringify(buildBody(model, payload, env))
+          body: JSON.stringify(buildBody(model, payload, env, wantStream))
         });
-        text = await upstream.text();
+
+        /*
+         * 流式：只要连接成功 + 有 body，立刻返回去透传，
+         * 绝不 await text() —— 那会把整个流读完，流式就白搭了。
+         *
+         * 代价：流式中途出错就没法换 key 了（字节已经发给前端）。
+         * 这是流式的固有取舍，只能在前端做兜底提示。
+         */
+        if (wantStream) {
+          if (upstream.ok && upstream.body) {
+            return { ok: true, streamResp: upstream, keyIdx: k + 1 };
+          }
+          text = await upstream.text().catch(() => '');
+        } else {
+          text = await upstream.text();
+        }
       } catch (e) {
         errors.push(`${model}: key#${k + 1} ${(e && e.message) || e}`);
         maxWait = Math.max(maxWait, DEFAULT_429_WAIT);
@@ -185,7 +216,15 @@ export async function handleAiChat(request, env, corsHeaders) {
       const r = await tryModelOnce(model, keys);
 
       if (r.ok) {
-        // 原样回传上游响应（前端要解析 tool_calls），只追加诊断头
+        // 流式：直接把上游 body 当作响应体透传，逐块发给前端，不落地缓存
+        if (r.streamResp) {
+          return new Response(r.streamResp.body, {
+            status: 200,
+            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors)
+          });
+        }
+
+        // 非流式：原样回传（前端要解析 tool_calls），只追加诊断头
         const headers = {
           'Content-Type': 'application/json; charset=utf-8',
           ...corsHeaders,
