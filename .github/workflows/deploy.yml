@@ -31,11 +31,30 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # ===== 新增：AI Copilot 的智谱密钥 =====
+          # 在 GitHub 仓库 → Settings → Secrets and variables → Actions
+          # 里新建 AI_API_KEYS，值填：key1,key2（英文逗号分隔，不要空格）
+          AI_API_KEYS: ${{ secrets.AI_API_KEYS }}
         run: |
           echo -n "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL
           echo -n "${{ secrets.SUPABASE_ANON_KEY }}" | npx wrangler secret put SUPABASE_ANON_KEY
           echo -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
           echo -n "${{ secrets.CRON_SECRET }}" | npx wrangler secret put CRON_SECRET
+
+          # AI Copilot —— 只有非空时才推送
+          #
+          # ⚠️ 为什么加这个判断：GitHub Actions 里未设置的 secret 会被展开成
+          #    空字符串。若直接 echo -n "" | wrangler secret put AI_API_KEYS，
+          #    会把「空值」写进 Cloudflare，**覆盖掉你在控制台配好的有效 key**，
+          #    结果 Copilot 全部请求返回 500，而且很难排查。
+          #
+          # 所以：没配 AI_API_KEYS 就跳过这一步，保留 Cloudflare 上已有的值。
+          if [ -n "$AI_API_KEYS" ]; then
+            echo "Pushing AI_API_KEYS..."
+            echo -n "$AI_API_KEYS" | npx wrangler secret put AI_API_KEYS
+          else
+            echo "AI_API_KEYS not set in repo secrets, skipping (keeping existing value on Cloudflare)"
+          fi
 
       - name: Deploy to Cloudflare Workers
         env:
