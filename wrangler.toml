@@ -3,8 +3,22 @@ main = "worker.js"
 compatibility_date = "2026-07-27"
 
 [vars]
-API_URL = "https://page.goose.gs.cn"
+API_URL = "https://host.goose.gs.cn"
 ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955"
+
+# ===== AI Copilot =====
+# 非敏感配置，写在这里（会随代码进 Git，但都是公开无害的值）
+AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+# 模型链，前一个不可用自动换下一个。用 tools/test_api.py 实测后覆盖
+AI_MODEL = "glm-4.7-flash,glm-4.6,glm-4-flash"
+AI_MAX_TOKENS = "4096"
+
+# ⚠️ AI_API_KEYS 绝对不要写在这里！
+# [vars] 是明文，会随 wrangler.toml 提交进 Git，等于把密钥公开。
+# 必须走加密通道（二选一）：
+#   1. wrangler secret put AI_API_KEYS      （有 wrangler 时）
+#   2. Cloudflare 控制台 → 本 Worker → Settings → Variables → Add → 勾选 Encrypt
+# 设置后无法再查看，只能覆盖。多个 key 用英文逗号分隔。
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"

@@ -40,6 +40,8 @@ import {
   handleDebugCleanup
 } from './debug.js';
 
+import { handleAiChat } from './ai/chat.js';
+
 // ===== Workers Entry =====
 export default {
   async fetch(request, env) {
@@ -124,6 +126,11 @@ export default {
     // POST /api/delete-account - 销号
     if (url.pathname === '/api/delete-account' && method === 'POST') {
       return await handleDeleteAccount(request, env, corsHeaders);
+    }
+
+    // POST /api/ai/chat - AI Copilot 转发（认证与限流在 handler 内）
+    if (url.pathname === '/api/ai/chat' && method === 'POST') {
+      return await handleAiChat(request, env, corsHeaders);
     }
 
     // POST /api/create - 创建站点
