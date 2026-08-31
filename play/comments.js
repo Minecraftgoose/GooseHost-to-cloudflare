@@ -4,7 +4,7 @@ import { getUserId, isAdmin } from '../utils/jwt.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
-import { loadProfiles, buildCommentTree, cleanText, optionalUserId } from './util.js';
+import { loadProfiles, buildCommentTree, cleanText } from './util.js';
 import { askGooseC, mentionsGooseC } from './ai.js';
 
 const MAX_CONTENT = 5000;
@@ -230,33 +230,4 @@ export async function handlePlayDeleteComment(request, env, corsHeaders, comment
   }
 }
 
-// GET /api/play/comments/recent - 全站最新评论（首页侧栏用，公开）
-export async function handlePlayRecentComments(request, env, corsHeaders) {
-  const url = new URL(request.url);
-  const limit = Math.min(20, Math.max(1, parseInt(url.searchParams.get('limit')) || 8));
-  await optionalUserId(request, env);
-  try {
-    const supabase = makeSupabase(env);
-    const { data: rows } = await supabase
-      .from('gh_play_comment')
-      .select('id, post_id, author_id, content, is_ai, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    const list = rows || [];
-    const profiles = await loadProfiles(env, list.map(r => r.author_id));
-    return jsonResp({
-      comments: list.map(r => ({
-        id: r.id,
-        post_id: r.post_id,
-        content: r.content.slice(0, 140),
-        created_at: r.created_at,
-        is_ai: !!r.is_ai,
-        author: r.is_ai
-          ? { id: null, nickname: '小鹅C', avatar_url: '', is_ai: true }
-          : { id: r.author_id, nickname: profiles.get(r.author_id)?.nickname || '', avatar_url: profiles.get(r.author_id)?.avatar_url || '', is_ai: false }
-      }))
-    }, 200, corsHeaders);
-  } catch (err) {
-    return jsonResp({ error: err.message }, 500, corsHeaders);
-  }
-}
+

@@ -51,7 +51,6 @@ import {
   handlePlayListComments,
   handlePlayCreateComment,
   handlePlayDeleteComment,
-  handlePlayRecentComments,
   handlePlayGetMe,
   handlePlayUpdateMe,
   handlePlayGetProfile,
@@ -319,11 +318,6 @@ export default {
     // PUT /api/play/me - 设置昵称/头像/简介（登录）
     if (url.pathname === '/api/play/me' && method === 'PUT') {
       return await handlePlayUpdateMe(request, env, corsHeaders);
-    }
-
-    // GET /api/play/comments/recent - 全站最新评论（公开）
-    if (url.pathname === '/api/play/comments/recent' && method === 'GET') {
-      return await handlePlayRecentComments(request, env, corsHeaders);
     }
 
     // POST /api/play/follow - 关注（登录）
