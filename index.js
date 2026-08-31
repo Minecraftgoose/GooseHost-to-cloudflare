@@ -33,6 +33,13 @@ import { handleAdminSyncEmails } from './admin/sync-emails.js';
 import { handleGetSystemStatus, handleSetSystemStatus } from './admin/system-status.js';
 import { handleGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
 import { handlePublicStats } from './admin/public-stats.js';
+import {
+  handleAdminPlayPosts,
+  handleAdminPlayComments,
+  handleAdminDeletePlayPost,
+  handleAdminDeletePlayComment,
+  handleAdminPlayStats
+} from './admin/play.js';
 
 import {
   handleDebugSyncEmails,
@@ -255,6 +262,35 @@ export default {
     // POST /api/admin/announcement - 发公告/清公告
     if (url.pathname === '/api/admin/announcement' && method === 'POST') {
       return await handleAdminAnnouncement(request, env, corsHeaders);
+    }
+
+    // === 管理员 - 广场管理 ===
+
+    // GET /api/admin/play/stats - 广场统计
+    if (url.pathname === '/api/admin/play/stats' && method === 'GET') {
+      return await handleAdminPlayStats(request, env, corsHeaders);
+    }
+
+    // GET /api/admin/play/posts - 广场帖子列表
+    if (url.pathname === '/api/admin/play/posts' && method === 'GET') {
+      return await handleAdminPlayPosts(request, env, corsHeaders);
+    }
+
+    // GET /api/admin/play/comments - 广场评论列表
+    if (url.pathname === '/api/admin/play/comments' && method === 'GET') {
+      return await handleAdminPlayComments(request, env, corsHeaders);
+    }
+
+    // DELETE /api/admin/play/post/:id - 删除帖子
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'play'
+        && pathParts[3] === 'post' && pathParts[4] && !pathParts[5] && method === 'DELETE') {
+      return await handleAdminDeletePlayPost(request, env, corsHeaders, pathParts[4]);
+    }
+
+    // DELETE /api/admin/play/comment/:id - 删除评论
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'play'
+        && pathParts[3] === 'comment' && pathParts[4] && !pathParts[5] && method === 'DELETE') {
+      return await handleAdminDeletePlayComment(request, env, corsHeaders, pathParts[4]);
     }
 
     // === Debug 路由 ===
