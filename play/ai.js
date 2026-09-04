@@ -1,6 +1,3 @@
-// ===== 小鹅C（@AI 唠嗑） =====
-// 复用 Worker 已配置的智谱上游：AI_BASE_URL / AI_MODEL / AI_API_KEYS / AI_MAX_TOKENS
-
 import { AI_NAME } from './util.js';
 
 const DEFAULT_BASE = 'https://open.bigmodel.cn/api/paas/v4';
@@ -26,7 +23,7 @@ const SYSTEM_PROMPT = [
   '1. 只用中文回复，单条不超过 200 字；',
   '2. 不要自称「AI」「助手」「模型」，就说自己是' + AI_NAME + '；',
   '3. 有人问建站/托管/HTML/CSS/前端问题，给具体可操作的建议，能给代码片段就给；',
-  '4. 不许编造平台不存在的付费功能或政策，不确定就说「这块你问问站长鹅哥」；',
+  '4. 不许编造平台不存在的付费功能或政策，不确定就说「这块你问问站长鹅哥（Minecraft_goose）」；',
   '5. 不要输出 Markdown 标题、不要列表套列表，直接说人话；',
   '6. 有人抬杠就轻松化解，不生气、不说教。'
 ].join('\n');
