@@ -409,8 +409,4 @@ export default {
       headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
     });
   }
-};rr.message);
-      }
-    }
-  },
 };
