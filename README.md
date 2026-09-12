@@ -21,7 +21,7 @@
 
 <p align="center">
   <b>免费静态网站托管平台 &middot; 无需服务器 &middot; 无需命令行 &middot; 一键部署到全球 CDN</b><br>
-  <sub>由 <a href="https://github.com/Minecraftgoose">Minecraft_goose</a> 开发 &middot; GooseCode&reg; 旗下产品</sub>
+  <sub>由 <a href="https://github.com/Minecraftgoose">Minecraft_goose</a> 开发 &middot; GooseCode 旗下产品</sub>
 </p>
 
 ---
