@@ -50,9 +50,12 @@ export async function handleServeQuick(request, env, id) {
 
   const auth = { Authorization: `Bearer ${key}` };
 
-  // 1) 用 public_id 反查网盘端 file id。建表即 O(1)；未建表则退化为列表遍历。
-  const fileId = await resolvePanFileId(env, id);
-  if (!fileId) return textResp(404, 'Not Found', cors);
+  // 1) 用 public_id 反查网盘端 file id 与真实扩展名。建表即 O(1)；未建表则退化为列表遍历。
+  //    realExt 与 storeExt 分离：网盘上存为 <id>.<ext>.txt（绕过扩展名白名单），
+  //    但对外必须按真实扩展名给 MIME，否则浏览器会把 HTML 当成纯文本下载。
+  const resolved = await resolvePanFileId(env, id);
+  if (!resolved) return textResp(404, 'Not Found', cors);
+  const { fileId, realExt } = resolved;
 
   // 2) 审核状态预检。所有业务字段都在 data 下，不存在顶层平铺，故只取 j.data。
   //    实测：pending 期间下载接口仍会返回 200，但内容不是源文件（占位/审核页），
@@ -100,21 +103,40 @@ export async function handleServeQuick(request, env, id) {
     return textResp(upstream.status, '上游拉取失败', { ...cors, 'X-Upstream-Detail': t.slice(0, 200) });
   }
 
+  // MIME 还原：网盘按 .txt 返回 Content-Type: text/plain，
+  // 但对外必须声明真实扩展名对应的类型，否则浏览器把 HTML 当纯文本下载。
+  // 落盘扩展绝不可作为推断依据——.html.txt 的真实类型仍是 text/html。
+  // 未知扩展统一兜底为 text/plain，不做兜底成 html 的假设。
+  const MIME = {
+    html: 'text/html; charset=utf-8',
+    htm: 'text/html; charset=utf-8',
+  };
+  const isHtml = realExt === 'html' || realExt === 'htm';
+
   const respHeaders = new Headers();
   // 必须透传的四项：Range 客户端（视频、下载器、断点续传）完全依赖这些头。
-  for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified']) {
+  for (const name of ['content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified']) {
     const v = upstream.headers.get(name);
     if (v) respHeaders.set(name, v);
   }
+  // Content-Type 不走透传：上游按落盘扩展名给的 text/plain 对我们无效。
+  respHeaders.set('content-type', MIME[realExt] || 'text/plain; charset=utf-8');
   // 响应侧允许浏览器读取 Range 相关头，否则前端代码拿不到这些信息。
   respHeaders.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag');
   respHeaders.set('Access-Control-Allow-Origin', '*');
   respHeaders.set('X-Content-Type-Options', 'nosniff');
-  if (!respHeaders.has('content-type')) respHeaders.set('content-type', 'text/html; charset=utf-8');
   if (!respHeaders.has('cache-control')) respHeaders.set('cache-control', CACHE_REVALIDATE);
   else if (String(upstream.status) === '206') {
     // 分片响应沿用上游缓存策略，但把可变部分补强。上游若返回 no-store，尊重它。
     respHeaders.set('cache-control', upstream.headers.get('cache-control') || CACHE_REVALIDATE);
+  }
+  // HTML 页面绝不走浏览器缓存：HTML 是部署产物，内容随时可能更新，
+  // 而用户又可能在同一会话内重新部署覆盖同一 id。max-age=0 + must-revalidate
+  // 让浏览器每次回源校验，代价是每次访问多一次 ETag 校验请求，换来内容新鲜。
+  if (isHtml) {
+    respHeaders.set('cache-control', 'no-cache, no-store, must-revalidate');
+    respHeaders.set('pragma', 'no-cache');
+    respHeaders.set('expires', '0');
   }
 
   // HEAD 与 206 都不能有 body；流式返回 upstream.body，避免大文件进 Worker 内存。
@@ -124,19 +146,20 @@ export async function handleServeQuick(request, env, id) {
   return new Response(upstream.body, { status: 200, headers: respHeaders });
 }
 
-// 反查网盘 file id。优先走本地映射表，命中即 O(1) 且不依赖网盘列表接口。
+// 反查网盘 file id 与真实扩展名。优先走本地映射表，命中即 O(1) 且不依赖网盘列表接口。
+// 返回 { fileId, realExt }；映射表不可用时返回 { fileId, realExt: null }，由调用方兜底为 text/plain。
 async function resolvePanFileId(env, publicId) {
   if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
       const { makeSupabase } = await import('../utils/supabase.js');
       const supabase = makeSupabase(env);
-      const { data } = await supabase.from('gh_quick').select('pan_file_id,security_status').eq('public_id', publicId).maybeSingle();
-      if (data && data.pan_file_id) return String(data.pan_file_id);
+      const { data } = await supabase.from('gh_quick').select('pan_file_id,ext').eq('public_id', publicId).maybeSingle();
+      if (data && data.pan_file_id) return { fileId: String(data.pan_file_id), realExt: data.ext || null };
     } catch (e) { console.error('resolvePanFileId db error', e.message); }
   }
 
   // 兜底：遍历网盘文件列表（慢、受分页限制，仅在映射表缺失时使用）。
-  // 命名约定为 <publicId>.<ext>，因此按文件名前缀匹配。
+  // 落盘命名约定为 <publicId>.<ext>.txt，故取全部点之前的部分作 stem 匹配。
   try {
     const key = (env && (env.PAN_API_KEY || env.PAN_APIKEY || env.EZV_API_KEY || '')) || '';
     const listResp = await fetch(`${PAN_BASE}/api/pan/files?pageSize=100`, {
@@ -148,7 +171,7 @@ async function resolvePanFileId(env, publicId) {
       for (const r of rows) {
         if (!r.name) continue;
         const stem = r.name.endsWith('.') ? r.name.slice(0, -1) : r.name.split('.').slice(0, -1).join('.');
-        if (stem === publicId) return String(r.id || r.fileId);
+        if (stem === publicId) return { fileId: String(r.id || r.fileId), realExt: null };
       }
     }
   } catch (e) { console.error('resolvePanFileId list error', e.message); }

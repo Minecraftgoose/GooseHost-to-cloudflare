@@ -26,17 +26,30 @@ const ID_LEN = 10;
 // 一旦放行大文件就变成公开的匿名带宽与存储通道。
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_NAME = 255;
-const ALLOWED_EXT = /^(html?|md|markdown|txt|css|js|json|xml|svg)$/i;
 
-// 文件类型白名单即内容安全边界：只允许能安全内联的静态资源，
-// 不接受 zip / exe / 二进制，避免本入口被当作任意文件托管。
-const MIME = {
-  html: 'text/html; charset=utf-8', htm: 'text/html; charset=utf-8',
-  md: 'text/markdown; charset=utf-8', markdown: 'text/markdown; charset=utf-8',
-  txt: 'text/plain; charset=utf-8', css: 'text/css; charset=utf-8',
-  js: 'text/javascript; charset=utf-8', json: 'application/json; charset=utf-8',
-  xml: 'application/xml; charset=utf-8', svg: 'image/svg+xml; charset=utf-8',
+// 本入口只接受 HTML。白云网盘按扩展名拦截 html/htm 上传，
+// 因此落盘时改写为 .html.txt 双扩展名（绕过白名单），访问时按真实扩展名还原 MIME。
+// 真实扩展名与落盘扩展名必须分账：前者决定对外 Content-Type，后者只是过审的壳。
+const ALLOWED_EXT = /^(html?)$/i;
+
+// 落盘扩展名映射：真实扩展 -> 网盘上实际存储的文件名扩展。
+// 白云网盘按最后一个点之后的扩展名做拦截，双扩展名可绕过。
+// 仅当网盘明确放行 html/htm 后，才应将这里改回单扩展。
+const STORE_EXT = {
+  html: 'html.txt',
+  htm: 'htm.txt',
 };
+
+// 访问出口的 MIME 严格按真实扩展名查表，禁止按落盘扩展推断——
+// 否则 .html.txt 会被当成 text/plain 输出，浏览器拒绝解析为 HTML。
+const MIME = {
+  html: 'text/html; charset=utf-8',
+  htm: 'text/html; charset=utf-8',
+};
+
+// 落盘文件名的正则校验：只接受 <随机id>.<ext>.txt 形态，拒绝任何额外段。
+// 防止伪造 filename 拼出 ../ 或附加段，越过路径边界。
+const SAFE_STORE_NAME = /^[\w-]{4,64}\.(?:html?|txt)$/i;
 
 function randId() {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -100,7 +113,7 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
 
   const file = form.get('file');
   if (!file || typeof file === 'string' || !file.size) {
-    return jsonResp({ error: '请选择要部署的文件' }, 400, corsHeaders);
+    return jsonResp({ error: '请选择要部署的 HTML 文件' }, 400, corsHeaders);
   }
   if (file.size > MAX_BYTES) {
     return jsonResp({ error: `文件超过 ${Math.round(MAX_BYTES / 1024 / 1024)}MB 限制` }, 413, corsHeaders);
@@ -112,12 +125,15 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
   name = name.split(/[/\\]/).pop(); // 只保留文件名，丢弃路径，防止 path traversal
   const ext = extOf(name);
   if (!ALLOWED_EXT.test(ext)) {
-    return jsonResp({ error: `不支持的文件类型 .${ext}（仅支持 html/htm/md/txt/css/js/json/xml/svg）` }, 400, corsHeaders);
+    return jsonResp({ error: `仅支持 HTML 文件（.html / .htm），当前为 .${ext}` }, 400, corsHeaders);
   }
 
-  // 随机生成访问路径，用户不可自选；碰撞则换新 id，最多重试 3 次。
-  let id = randId();
-  let filename = `${id}.${ext}`;
+  // 真实扩展与落盘扩展分离：网盘侧存为 <id>.<ext>.txt 以绕过扩展名白名单，
+  // 访问出口按真实 ext 还原 MIME。id 随机生成且用户不可自选。
+  const storeExt = STORE_EXT[ext] || `${ext}.txt`;
+  const id = randId();
+  const filename = `${id}.${storeExt}`;
+  const realExt = ext;
 
   const auth = { Authorization: `Bearer ${key}` };
 
@@ -136,7 +152,7 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
     if (initResp.status === 409) {
       // 文件名冲突理论上不会发生（id 是随机的），发生时换新 id 重试一次。
       id = randId();
-      filename = `${id}.${ext}`;
+      filename = `${id}.${storeExt}`;
       const r2 = await fetch(`${PAN_BASE}/api/pan/uploads`, {
         method: 'POST',
         headers: { ...auth, 'Content-Type': 'application/json' },
@@ -203,7 +219,8 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
       const supabase = makeSupabase(env);
       await supabase.from('gh_quick').insert({
         public_id: id,
-        ext,
+        ext: realExt,
+        store_ext: storeExt,
         filename: name,
         pan_file_id: panFileId,
         size: file.size,
