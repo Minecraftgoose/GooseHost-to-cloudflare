@@ -17,7 +17,6 @@
 //   - 注意：上传/完成用 size，元数据接口此处为 byteSize，两处字段名不同，不要混用
 
 import { jsonResp } from '../utils/response.js';
-import { getClientIP, checkRateLimit } from '../utils/rate-limit.js';
 
 const PAN_BASE = 'https://pan.ezv.cc';
 const UPLOAD_PREFIX = 'f';
@@ -85,19 +84,11 @@ export async function handleQuickInfo(request, env, corsHeaders) {
 
 // POST /api/quick/deploy —— 单文件快速部署
 // 表单字段：file（File / Blob）
+//
+// 注意：本入口免登录，不做速率限制。防刷能力改为由文件白名单（类型、
+// 扩展名、大小上限 2MB）与随机访问路径承担——前者堵住任意文件托管，
+// 后者让刷量无法指定目标路径。若日后需要恢复限流，取消下面的注释即可。
 export async function handleQuickDeploy(request, env, corsHeaders) {
-  // 免登录入口：按 IP 限流，防止被当作免费上传接口刷量。
-  // 注意：一次部署会触发多次网盘往返，必须使用专用动作，不能与 rapid（10次/10秒）混用。
-  const rl = await checkRateLimit(request, env, 'quick');
-  if (rl && !rl.ok) {
-    const retryAfter = rl.resetIn || 60;
-    return jsonResp(
-      { error: `请求过于频繁，请 ${retryAfter} 秒后再试` },
-      429,
-      { ...corsHeaders, 'Retry-After': String(retryAfter) }
-    );
-  }
-
   let key;
   try { key = panKey(env); } catch (e) { return jsonResp({ error: '快速部署暂不可用，请联系管理员' }, 503, corsHeaders); }
 
