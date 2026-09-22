@@ -89,7 +89,7 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
   // 免登录入口：按 IP 限流，防止被当作免费上传接口刷量。
   // 注意：一次部署会触发多次网盘往返，必须使用专用动作，不能与 rapid（10次/10秒）混用。
   const rl = await checkRateLimit(request, env, 'quick');
-  if (!rl.allowed) {
+  if (rl && !rl.ok) {
     const retryAfter = rl.resetIn || 60;
     return jsonResp(
       { error: `请求过于频繁，请 ${retryAfter} 秒后再试` },

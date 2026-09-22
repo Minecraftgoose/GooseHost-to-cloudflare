@@ -30,42 +30,14 @@ const RATE_LIMIT = {
                                                          //   30 次留给正常交互，同时挡住脚本刷 key）
 };
 
-// 反代/网关出口 IP 白名单：命中后继续往后取更靠客户端的地址。
-// 通过 wrangler.toml 的 [vars] 配置 RATE_LIMIT_GATEWAY_IPS="1.2.3.4,5.6.7.8"。
-// 未配置时本集合为空，不影响正常逻辑；配错了也只是多取一层地址，不会误伤。
-const GATEWAY_IPS = new Set(
-  (process.env.RATE_LIMIT_GATEWAY_IPS || '').split(',').map((s) => s.trim()).filter(Boolean)
-);
-
-// 开发态调试开关。设为 '1' 后命中限流时会打印 action / ip / count / limit，
-// 用于判断"是真被刷了"还是"IP 维度失效导致全站共享计数"。
-// 日志量 = 请求量，长期开启会让 KV 读取成本翻倍，验证完务必关掉。
-const DEBUG = process.env.RATE_LIMIT_DEBUG === '1';
-
 function getClientIP(request) {
-  const cands = [
-    request.headers.get('CF-Connecting-IP'),
-    (request.headers.get('X-Forwarded-For') || '').split(',').map((s) => s.trim()).filter(Boolean)[0],
-    request.headers.get('X-Real-IP'),
-    request.headers.get('True-Client-IP'),
-    request.headers.get('X-Client-IP'),
-  ].filter(Boolean);
-
-  for (const v of cands) {
-    if (!GATEWAY_IPS.has(v)) return v;
-  }
-
-  if (DEBUG && cands.length) {
-    console.log('[rl] all candidates are gateway IPs, fell back to ' + cands[0]);
-  }
-  return cands[0] || 'unknown';
+  return request.headers.get('CF-Connecting-IP') ||
+         request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
+         'unknown';
 }
 
 async function checkRateLimit(request, env, action = 'normal', keyExtra = null) {
-  // 未绑定 KV 时完全跳过限流，避免未配置环境（本地 dev / 配置缺失）下误伤。
-  // 注意：这里语义是"没 KV 就放行"，与部分人直觉相反，切勿改成反向判断。
   if (!env || !env.RATE_LIMIT_KV) {
-    if (DEBUG) console.log('[rl] skip: no RATE_LIMIT_KV');
     return { allowed: true };
   }
 
@@ -89,8 +61,8 @@ async function checkRateLimit(request, env, action = 'normal', keyExtra = null) 
         }
         // 锁定已过期：清理锁，并顺手清掉计数桶，
         // 否则同一窗口内 count 早已 >= limit，解锁后会立刻再次被锁。
-        await env.RATE_LIMIT_KV.delete(lockKey).catch(() => {});
-        await env.RATE_LIMIT_KV.delete(countKey).catch(() => {});
+        await env.RATE_LIMIT_KV.delete(lockKey);
+        await env.RATE_LIMIT_KV.delete(countKey);
       }
     } catch (_) {
       // 锁状态读取失败不阻断请求，降级放行。
@@ -101,26 +73,19 @@ async function checkRateLimit(request, env, action = 'normal', keyExtra = null) 
     const raw = await env.RATE_LIMIT_KV.get(countKey, 'text');
     const count = raw ? parseInt(raw, 10) : 0;
 
-    if (DEBUG) {
-      console.log(`[rl] action=${action} ip=${ip} count=${count} limit=${cfg.limit} key=${countKey}`);
-    }
-
     if (count >= cfg.limit) {
       // create 类超额时建立 lockout 并清空当前窗口计数，下一窗口才能恢复。
       if (cfg.lockoutSec) {
         const lockKey = `lck:${ip}:${action}`;
         const expiresAt = now + cfg.lockoutSec;
-        await env.RATE_LIMIT_KV.put(lockKey, String(expiresAt), { expirationTtl: cfg.lockoutSec }).catch(() => {});
-        await env.RATE_LIMIT_KV.delete(countKey).catch(() => {});
+        await env.RATE_LIMIT_KV.put(lockKey, String(expiresAt), { expirationTtl: cfg.lockoutSec });
+        await env.RATE_LIMIT_KV.delete(countKey);
         return { allowed: false, resetIn: cfg.lockoutSec, retryAfter: cfg.lockoutSec, locked: true };
       }
       return { allowed: false, resetIn: cfg.windowSec - (now - windowStart) };
     }
 
-    // ---- 原子递增 ----
-    // KV 没有原生 increment。此处先读后写存在并发读改写覆盖的可能，
-    // 但 init / part / complete 之间的并发冲突概率低，业务上允许少量误差；
-    // 需要严格精确时改用 Durable Object 或 Lua 脚本。
+    // ---- 计数递增 ----
     if (count === 0) {
       await env.RATE_LIMIT_KV.put(countKey, '1', {
         expirationTtl: cfg.windowSec + 30,
