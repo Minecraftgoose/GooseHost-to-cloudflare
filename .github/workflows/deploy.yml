@@ -35,6 +35,10 @@ jobs:
           # 在 GitHub 仓库 → Settings → Secrets and variables → Actions
           # 里新建 AI_API_KEYS，值填：key1,key2（英文逗号分隔，不要空格）
           AI_API_KEYS: ${{ secrets.AI_API_KEYS }}
+          # ===== 新增：白云网盘 API Key =====
+          # 在仓库 Actions secrets 里新建 PAN_API_KEY，值填你的白云网盘 Key。
+          # 这是「快速部署一个」功能唯一的后端凭证，前端完全不接触。
+          PAN_API_KEY: ${{ secrets.PAN_API_KEY }}
         run: |
           echo -n "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL
           echo -n "${{ secrets.SUPABASE_ANON_KEY }}" | npx wrangler secret put SUPABASE_ANON_KEY
@@ -54,6 +58,19 @@ jobs:
             echo -n "$AI_API_KEYS" | npx wrangler secret put AI_API_KEYS
           else
             echo "AI_API_KEYS not set in repo secrets, skipping (keeping existing value on Cloudflare)"
+          fi
+
+          # ===== 白云网盘（快速部署 /f/:id 用）=====
+          # 前端「快速部署一个」走的是 pan.ezv.cc，不上传 GooseHost 自己的存储。
+          # 密钥同样只在 Cloudflare Worker 侧持有，前端拿不到。
+          #
+          # 注意：若未配置 PAN_API_KEY，前端卡片会自动隐藏、接口返回 503，
+          # 已登录用户走 dashboard 的普通部署流程不受影响，可安全留空。
+          if [ -n "$PAN_API_KEY" ]; then
+            echo "Pushing PAN_API_KEY..."
+            echo -n "$PAN_API_KEY" | npx wrangler secret put PAN_API_KEY
+          else
+            echo "PAN_API_KEY not set in repo secrets, skipping (quick deploy card will stay hidden)"
           fi
 
       - name: Deploy to Cloudflare Workers
