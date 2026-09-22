@@ -1,4 +1,4 @@
-﻿// ===== 速率限制 =====
+// ===== 速率限制 =====
 //
 // 设计要点：
 // 1. 固定窗口计数，按 action 分桶。桶 key 为 rl:<action>:<windowStart>:<dim>，
@@ -23,37 +23,43 @@ const RATE_LIMIT = {
   reset:        { limit: 10, windowSec: 3600 },          // 每 IP 每小时最多 10 次重置密码
   me_update:    { limit: 20, windowSec: 60 },            // 昵称修改：每 IP 每分钟最多 20 次
   delete_acct:  { limit: 3,  windowSec: 3600 },          // 注销账号：每 IP 每小时最多 3 次
-  ai_chat:      { limit: 30,  windowSec: 60 },           // AI Copilot：每 IP 每分钟最多 30 次
-  play_write:   { limit: 40,  windowSec: 60 },           // 广场写操作：发帖/点赞/关注/改资料
-  play_comment: { limit: 20,  windowSec: 60 },           // 广场评论：每 IP 每分钟最多 20 条
+  ai_chat:      { limit: 30, windowSec: 60 },            // AI Copilot：每 IP 每分钟最多 30 次
+  play_write:   { limit: 40, windowSec: 60 },            // 广场写操作：发帖/点赞/关注/改资料
+  play_comment: { limit: 20, windowSec: 60 },            // 广场评论：每 IP 每分钟最多 20 条
                                                          // （一轮建站对话内部最多 12 轮请求，
                                                          //   30 次留给正常交互，同时挡住脚本刷 key）
 };
 
+// 反代/网关出口 IP 白名单：命中后继续往后取更靠客户端的地址。
+// 通过 wrangler.toml 的 [vars] 配置 RATE_LIMIT_GATEWAY_IPS="1.2.3.4,5.6.7.8"。
+// 未配置时本集合为空，不影响正常逻辑；配错了也只是多取一层地址，不会误伤。
+const GATEWAY_IPS = new Set(
+  (process.env.RATE_LIMIT_GATEWAY_IPS || '').split(',').map((s) => s.trim()).filter(Boolean)
+);
+
+// 开发态调试开关。设为 '1' 后命中限流时会打印 action / ip / count / limit，
+// 用于判断"是真被刷了"还是"IP 维度失效导致全站共享计数"。
+// 日志量 = 请求量，长期开启会让 KV 读取成本翻倍，验证完务必关掉。
+const DEBUG = process.env.RATE_LIMIT_DEBUG === '1';
+
 function getClientIP(request) {
-  // 优先级：Cloudflare 真实客户端 IP > 反代传递的 X-Forwarded-For 首段 >
-  // 其他常见代理头兜底 > 'unknown'。
-  // 反代/网关若未正确传递真实 IP，此处会取到网关 IP，导致所有用户共享同一
-  // 计数桶，等于"全站一起被限流"；上线后用 GATEWAY_IPS 把网关出口 IP 列入
-  // 排除清单，让函数继续往后取更靠客户端的地址。
-  const candidates = [
+  const cands = [
     request.headers.get('CF-Connecting-IP'),
-    (request.headers.get('X-Forwarded-For') || '').split(',').map(s => s.trim()).find(Boolean),
+    (request.headers.get('X-Forwarded-For') || '').split(',').map((s) => s.trim()).filter(Boolean)[0],
     request.headers.get('X-Real-IP'),
     request.headers.get('True-Client-IP'),
     request.headers.get('X-Client-IP'),
-  ];
-  for (const v of candidates) {
-    if (v && !GATEWAY_IPS.has(v)) return v;
+  ].filter(Boolean);
+
+  for (const v of cands) {
+    if (!GATEWAY_IPS.has(v)) return v;
   }
-  return 'unknown';
+
+  if (DEBUG && cands.length) {
+    console.log('[rl] all candidates are gateway IPs, fell back to ' + cands[0]);
+  }
+  return cands[0] || 'unknown';
 }
-
-const GATEWAY_IPS = new Set((process.env.RATE_LIMIT_GATEWAY_IPS || '').split(',').map(s => s.trim()).filter(Boolean));
-
-// 开发态可把 RATE_LIMIT_DEBUG=1 塞进 vars，命中限流时输出 action / IP / 当前计数，
-// 用于判断"是真被刷了"还是"IP 维度失效导致全站共享计数"。
-const DEBUG = process.env.RATE_LIMIT_DEBUG === '1';
 
 async function checkRateLimit(request, env, action = 'normal', keyExtra = null) {
   // 未绑定 KV 时完全跳过限流，避免未配置环境（本地 dev / 配置缺失）下误伤。
@@ -96,7 +102,7 @@ async function checkRateLimit(request, env, action = 'normal', keyExtra = null) 
     const count = raw ? parseInt(raw, 10) : 0;
 
     if (DEBUG) {
-      console.log(\`[rl] action=\${action} ip=\${ip} count=\${count} limit=\${cfg.limit} key=\${countKey}\`);
+      console.log(`[rl] action=${action} ip=${ip} count=${count} limit=${cfg.limit} key=${countKey}`);
     }
 
     if (count >= cfg.limit) {
@@ -112,9 +118,9 @@ async function checkRateLimit(request, env, action = 'normal', keyExtra = null) 
     }
 
     // ---- 原子递增 ----
-    // KV 没有原生 increment。首次写入用 put 的 add 语义（key 不存在才写入），
-    // 避免 init / part / complete 三次 await 之间的并发读改写把计数覆盖掉。
-    // 已存在时走读取后 +1 写入；并发冲突概率低，这里不追求严格精确。
+    // KV 没有原生 increment。此处先读后写存在并发读改写覆盖的可能，
+    // 但 init / part / complete 之间的并发冲突概率低，业务上允许少量误差；
+    // 需要严格精确时改用 Durable Object 或 Lua 脚本。
     if (count === 0) {
       await env.RATE_LIMIT_KV.put(countKey, '1', {
         expirationTtl: cfg.windowSec + 30,
