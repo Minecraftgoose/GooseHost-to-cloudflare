@@ -22,6 +22,8 @@ import { handleSiteFiles } from './sites/files.js';
 import { handleGetProjectFile, handlePutProjectFile, handleDeleteProjectFile } from './sites/project-file.js';
 import { handleServeSite } from './sites/serve.js';
 import { handleServeProject } from './sites/project.js';
+import { handleQuickDeploy, handleQuickInfo as handleQuickInfoRoute, handleQuickDelete } from './sites/quick.js';
+import { handleServeQuick } from './sites/quick-serve.js';
 
 import { handleAdminStats } from './admin/stats.js';
 import { handleAdminUsers } from './admin/users.js';
@@ -142,6 +144,24 @@ export default {
     // POST /auth/signup - 代理注册
     if (url.pathname === '/auth/signup' && method === 'POST') {
       return await handleSignup(request, env, corsHeaders);  
+    }
+
+    // === 快速部署（免登录，文件落白鸽网盘，不进 GooseHost 存储）===
+    // 访问地址固定为 /f/<随机id>，id 由后端生成，用户不可选。
+
+    // GET /api/quick/info - 前端探测入口是否开放
+    if (url.pathname === '/api/quick/info' && method === 'GET') {
+      return await handleQuickInfoRoute(request, env, corsHeaders);
+    }
+
+    // POST /api/quick/deploy - 上传一个文件并生成 /f/<id>
+    if (url.pathname === '/api/quick/deploy' && method === 'POST') {
+      return await handleQuickDeploy(request, env, corsHeaders);
+    }
+
+    // POST /api/quick/:id/delete - 删除（需鉴权：本人或管理员）
+    if (pathParts[0] === 'api' && pathParts[1] === 'quick' && pathParts[2] && pathParts[3] === 'delete' && !pathParts[4] && method === 'POST') {
+      return await handleQuickDelete(request, env, corsHeaders, pathParts[2]);
     }
 
     // === 需要认证的路由 ===
@@ -400,6 +420,11 @@ export default {
     // GET /md/:slug - 访问 Markdown 站点
     if (pathParts[0] === 'md' && pathParts[1] && !pathParts[2] && method === 'GET') {
       return await handleServeSite(request, env, pathParts[1]);
+    }
+
+    // GET|HEAD /f/:id - 快速部署文件访问（文件在白鸽网盘，id 由后端随机生成）
+    if (pathParts[0] === 'f' && pathParts[1] && !pathParts[2] && (method === 'GET' || method === 'HEAD')) {
+      return await handleServeQuick(request, env, pathParts[1]);
     }
 
     // === 404 ===
