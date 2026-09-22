@@ -131,8 +131,8 @@ export async function handleQuickDeploy(request, env, corsHeaders) {
   // 真实扩展与落盘扩展分离：网盘侧存为 <id>.<ext>.txt 以绕过扩展名白名单，
   // 访问出口按真实 ext 还原 MIME。id 随机生成且用户不可自选。
   const storeExt = STORE_EXT[ext] || `${ext}.txt`;
-  const id = randId();
-  const filename = `${id}.${storeExt}`;
+  let id = randId();
+  let filename = `${id}.${storeExt}`;
   const realExt = ext;
 
   const auth = { Authorization: `Bearer ${key}` };
