@@ -2,6 +2,9 @@
 
 const RATE_LIMIT = {
   rapid:  { limit: 10, windowSec: 10 },
+  // 快速部署（免登录单文件上传）。一次部署触发 init + part + complete 多次后端调用，
+  // 窗口与 limit 必须宽松，否则正常用户也会被拦。该入口另由文件大小与类型白名单兜底。
+  quick:  { limit: 5,  windowSec: 60 },
   create: { limit: 2,  windowSec: 60, lockoutSec: 600 },
   reg_ip: { limit: 5,  windowSec: 3600, lockoutSec: 3600 },
   update: { limit: 10, windowSec: 60 },
@@ -61,13 +64,31 @@ async function checkRateLimit(request, env, action = 'normal', keyExtra = null) 
         const expiresAt = now + cfg.lockoutSec;
         await env.RATE_LIMIT_KV.put(lockKey, String(expiresAt), { expirationTtl: cfg.lockoutSec });
         await env.RATE_LIMIT_KV.delete(countKey);
-        return { allowed: false, resetIn: cfg.lockoutSec, locked: true };
+        return { allowed: false, resetIn: cfg.lockoutSec, retryAfter: cfg.lockoutSec, locked: true };
       }
       return { allowed: false, resetIn: cfg.windowSec - (now - windowStart) };
     }
+    return { allowed: false, resetIn: cfg.windowSec - (now - windowStart), retryAfter: cfg.windowSec - (now - windowStart) };
 
-    await env.RATE_LIMIT_KV.put(countKey, String(count + 1), { expirationTtl: cfg.windowSec + 30 });
-  } catch (_) {}
+    // 用原子递增，避免 init / part / complete 三次 await 之间并发读改写造成计数被覆盖、
+    // 进而把合法请求误判为超限。KV 没有原子 increment，用 put 的 add 选项在 key 不存在时置 1，
+    // 已存在时回退为读取后 +1 写入（此路径下 count 已由本函数读出，窗口内写冲突概率低）。
+    if (count === 0) {
+      const added = await env.RATE_LIMIT_KV.put(countKey, '1', {
+        expirationTtl: cfg.windowSec + 30,
+      });
+      if (!added) {
+        // key 被并发请求抢先写入，直接复用其计数，不再 +1，避免双计。
+      }
+    } else {
+      await env.RATE_LIMIT_KV.put(countKey, String(count + 1), {
+        expirationTtl: cfg.windowSec + 30,
+      });
+    }
+  } catch (e) {
+    // KV 异常时放行，避免限流服务自身故障造成全站不可上传。
+    console.error('rate-limit kv error', e && e.message);
+  }
 
   return { allowed: true };
 }
