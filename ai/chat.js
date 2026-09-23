@@ -34,7 +34,8 @@ const PROVIDERS = {
   //
   // ⚠️ 关键：Zen 的 endpoint 是【按模型族区分的】，不是统一的 /chat/completions。
   //   /chat/completions → DeepSeek V4.x、MiniMax M2.x/M3、GLM 5.x、Kimi K2.x/K3、
-  //                       big-pickle、mimo-*-free、ling-3.0-flash-fin-free、nemotron-*-free
+  //                       big-pickle、mimo-*-free、ling-3.0-flash-fin-free、nemotron-*-free、
+  //                       hy3-free、deepseek-v4-flash-free
   //   /responses        → GPT 5.x / GPT 6 Astra、Grok 4.x、grok-build、Muse Spark
   //   /messages         → Claude（Opus/Sonnet/Haiku/Fable）、Qwen3.x
   //   /models/<id>      → Gemini 3.x
@@ -44,24 +45,28 @@ const PROVIDERS = {
   // 并直接给出明确报错，而不是静默打到错误端点上。
   //
   // 免费模型（官方定价表标为 Free，多为限时提供）：
-  //   big-pickle / mimo-v2.6-flash-free / mimo-v2.5-free / ling-3.0-flash-fin-free /
-  //   nemotron-3-ultra-free / nemotron-3.5-lightning-free
-  //   （muse-spark-1.3-contributor-free、jev-1.13-free 也免费，但走 /responses、/systemone）
-  // 按量付费（节选，$/1M tokens）：deepseek-v4-flash 0.14/0.28、deepseek-v4-pro 1.74/3.48、
-  //   deepseek-v4.1-flash 0.30/1.20、glm-5.3-flash 0.15/0.50、minimax-m3 0.30/1.20。
+  //   big-pickle / mimo-v2.5-free / ling-3.0-flash-fin-free /
+  //   nemotron-3-ultra-free / nemotron-3.5-lightning-free / hy3-free
+  //   （muse-spark-1.2-contributor-free、muse-spark-1.3-contributor-free 也免费，但走 /responses）
+  // 按量付费（节选，$/1M tokens）：deepseek-v4-pro、deepseek-v4.1-flash、glm-5.3-flash、
+  //   minimax-m3、kimi-k3、deepseek-v4-flash。
   // 全量模型与元数据可拉取：https://opencode.ai/zen/v1/models
+  // ⚠️ deepseek-v4-flash 不带 -free 后缀，是【付费模型】；免费端点是
+  // deepseek-v4-flash-free（已在列表中）。两者不要混用。
   'opencode-zen': {
     label: 'OpenCode Zen',
     baseURL: 'https://opencode.ai/zen/v1',
     models: [
       // 免费（/chat/completions）
       'big-pickle',
-      'mimo-v2.6-flash-free', 'mimo-v2.5-free',
+      'mimo-v2.5-free',
       'ling-3.0-flash-fin-free',
       'nemotron-3-ultra-free', 'nemotron-3.5-lightning-free',
+      'hy3-free', 'deepseek-v4-flash-free',
       // 按量（/chat/completions）
-      'deepseek-v4-flash', 'deepseek-v4.1-flash', 'deepseek-v4-pro',
-      'glm-5.3-flash', 'minimax-m3', 'kimi-k3'
+      'deepseek-v4-pro', 'deepseek-v4.1-flash',
+      'glm-5.3-flash', 'minimax-m3', 'kimi-k3',
+      'deepseek-v4-flash'
     ],
     // Zen 不强制 thinking 参数；计费由 opencode.ai/zen 控制台侧管理，后端不做改写。
     extraBody: {}
@@ -230,6 +235,7 @@ export async function handleAiChat(request, env, corsHeaders) {
     return jsonResp({ error: msg, retryAfter: Math.ceil(rl.resetIn) }, 429, corsHeaders);
   }
   const serverKeyList = keyChain(env);
+  const errors = [];                       // 函数级作用域：tryModelOnce 闭包与汇总返回都会 push
   let payload;
   try { payload = await request.json(); } catch {
     return jsonResp({ error: 'Invalid JSON body' }, 400, corsHeaders);
