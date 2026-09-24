@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="icon" type="image/x-icon" href="icons/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16x16.png" />
+    <link rel="apple-touch-icon" href="icons/icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128x128.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="256x256" href="icons/icon-256x256.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png" />
+    <meta property="og:image" content="icons/og-image-1200x630.png" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GooseHost">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="GooseHost - 免费的静态网站托管平台，支持 HTML 上传，一键部署，全球 CDN 加速。简单、快速、可靠。" />
+    <meta name="keywords" content="静态网站托管, HTML托管, 免费网站托管, CDN加速, 网站部署, 个人网站" />
+    <meta name="author" content="GooseHost" />
+    <meta name="robots" content="index, follow" />
+    <meta name="msvalidate.01" content="F26AA8B56E846BA40C6FABA37F0B1669" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="GooseHost - 静态网站托管" />
+    <meta property="og:description" content="免费的静态网站托管平台，支持 HTML 上传，一键部署，全球 CDN 加速。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://host.goose.cc.cd/" />
+    <meta property="og:site_name" content="GooseHost" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="GooseHost - 静态网站托管" />
+    <meta name="twitter:description" content="免费的静态网站托管平台，支持 HTML 上传，一键部署，全球 CDN 加速。" />
+
+    <title>GooseHost - 静态网站托管</title>
+
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="splash-active">
+    <div class="sr-only">GooseHost - 静态网站托管</div>
+
+    <!-- ===== 开屏加载 ===== -->
+    <div class="splash-screen" id="splashScreen">
+        <svg class="infinity-wrap" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+            <path class="infinity-path" d="M 50,50 C 50,20 80,20 100,50 C 120,80 150,80 150,50 C 150,20 120,20 100,50 C 80,80 50,80 50,50 Z" />
+        </svg>
+        <img src="logo.svg" class="splash-logo" alt="GooseHost">
+    </div>
+
+    <!-- ===== 背景层 ===== -->
+    <div id="bgLayer" class="bg-layer"></div>
+
+    <!-- ===== 主容器 ===== -->
+    <div class="container">
+
+        <!-- Hero 区 -->
+        <header class="hero">
+            <div class="hero-logo reveal up">
+                <img src="logo.svg" alt="GooseHost" />
+                <span class="hero-brand">GOOSEHOST</span>
+            </div>
+            <h1 class="hero-title reveal up">还在和 GitHub 较劲，<br>就为了传个 HTML？</h1>
+            <p class="hero-sub reveal up">GooseHost · 免费静态网站托管 —— <span class="hl">粘贴即部署</span>，<span class="hl">全球 CDN 加速</span>，在哪都能访问</p>
+            <div class="hero-cta reveal up">
+                <a href="/dashboard" class="btn-explore">
+                    <i class="fas fa-compass"></i> 开始探索
+                </a>
+                <a href="api-docs/index.html" class="btn-api">
+                    <i class="fas fa-book"></i> API 文档
+                </a>
+                <a href="playground/" class="btn-api">
+                    <i class="fas fa-comments"></i> 逛广场
+                </a>
+            </div>
+            <div class="url-compare reveal up">
+                <span class="url-old">github.io/your-super-long-repo-name</span>
+                <span class="url-arrow"><i class="fas fa-arrow-right"></i></span>
+                <span class="url-new">page.goose.cc.cd/s/you</span>
+            </div>
+            <div class="hero-badges reveal up">
+                <span class="hero-badge"><i class="fas fa-gift"></i> 免费</span>
+                <span class="hero-badge"><i class="fas fa-ban"></i> 无广告</span>
+                <span class="hero-badge"><i class="fas fa-eye-slash"></i> 无追踪</span>
+            </div>
+            <div class="hero-stats reveal up" style="animation-delay:0s">
+                <div class="hero-stat">
+                    <div class="num" id="statSites">-</div>
+                    <div class="lbl">托管网站</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="num" id="statVisits">-</div>
+                    <div class="lbl">累计访问</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 特性区 -->
+        <section class="section">
+            <div class="section-head reveal up">
+                <h2>为什么选 GooseHost？</h2>
+                <p>把网站扔上来，剩下的交给我们</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card glass-card reveal left">
+                    <i class="fas fa-rocket"></i>
+                    <h3>一键部署</h3>
+                    <p>无需命令行，粘贴 HTML 就能上线</p>
+                </div>
+                <div class="feature-card glass-card reveal right">
+                    <i class="fas fa-globe"></i>
+                    <h3>全球 CDN</h3>
+                    <p>多节点缓存加速，在哪都能访问</p>
+                </div>
+                <div class="feature-card glass-card reveal left">
+                    <i class="fas fa-link"></i>
+                    <h3>短链接</h3>
+                    <p>简洁好记，分享无压力</p>
+                </div>
+                <div class="feature-card glass-card reveal right">
+                    <i class="fas fa-shield-halved"></i>
+                    <h3>免费无广告</h3>
+                    <p>不收费，不插广告，不追踪</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 对比区 -->
+        <section class="section">
+            <div class="section-head reveal up">
+                <h2>换个方式部署</h2>
+                <p>同是静态托管，体验天差地别</p>
+            </div>
+            <div class="compare-grid">
+                <div class="compare-card glass-card bad reveal left">
+                    <span class="cmp-tag">传统方式</span>
+                    <h3>GitHub Pages</h3>
+                    <ul>
+                        <li><i class="fas fa-times"></i> 创建仓库、配分支、等构建</li>
+                        <li><i class="fas fa-times"></i> 命令行走一遍，新手劝退</li>
+                        <li><i class="fas fa-times"></i> 链接又长又难记</li>
+                        <li><i class="fas fa-times"></i> 改一次重新提交一次</li>
+                    </ul>
+                </div>
+                <div class="compare-vs reveal scale"><span class="cmp-arrow-h">→</span><span class="cmp-arrow-v">↓</span></div>
+                <div class="compare-card glass-card good reveal right">
+                    <span class="cmp-tag">GooseHost</span>
+                    <h3>三步上线</h3>
+                    <ul>
+                        <li><i class="fas fa-check"></i> 打开 dashboard，登录</li>
+                        <li><i class="fas fa-check"></i> 粘贴 HTML / Markdown</li>
+                        <li><i class="fas fa-check"></i> 复制短链接，完事</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 教程区 -->
+        <section class="section">
+            <div class="section-head reveal up">
+                <h2>使用教程</h2>
+                <p>一分钟上手，看看怎么玩</p>
+            </div>
+            <div class="glass-card reveal scale" style="padding:0.8rem; animation-delay:2.3s">
+                <iframe src="https://player.bilibili.com/player.html?isOutside=true&aid=116836213461377&bvid=BV1ivKo6TEvv&cid=39518930511&p=1&autoplay=1&muted=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" allow="autoplay" class="tutorial-frame"></iframe>
+            </div>
+        </section>
+
+        <!-- FAQ 模块 -->
+        <section class="section">
+            <div class="faq-container glass-card reveal up">
+                <div class="faq-header">
+                    <i class="fas fa-circle-question"></i>
+                    <h3>常见问题</h3>
+                    <span>FAQ</span>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+                        <span class="q-text">GooseHost 是什么？</span>
+                        <span class="q-icon"><i class="fas fa-chevron-down"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="a-text">
+                            <i class="fas fa-arrow-right"></i>
+                            GooseHost 是一个<strong>开源免费</strong>的静态网站托管平台，支持 HTML、CSS、JavaScript 等静态文件的上传和部署，提供全球 CDN 加速，让您的网站快速、稳定地访问。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+                        <span class="q-text">如何上传我的网站？</span>
+                        <span class="q-icon"><i class="fas fa-chevron-down"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="a-text">
+                            <i class="fas fa-arrow-right"></i>
+                            点击 「开始探索」 登录/注册后进入 dashboard，在控制台中您可以上传您的 html/md 文件，全程无需命令行。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+                        <span class="q-text">支持哪些文件类型？</span>
+                        <span class="q-icon"><i class="fas fa-chevron-down"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="a-text">
+                            <i class="fas fa-arrow-right"></i>
+                            支持 <code>.html</code>、<code>.md</code>、<code>.zip</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+                        <span class="q-text">有流量或存储限制吗？</span>
+                        <span class="q-icon"><i class="fas fa-chevron-down"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="a-text">
+                            <i class="fas fa-arrow-right"></i>
+                            GooseHost 的总储存空间为 <strong>1GB</strong>
+                            <p>注意您的上传速度不宜过快</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
+                        <span class="q-text">还有更多问题？</span>
+                        <span class="q-icon"><i class="fas fa-chevron-down"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="a-text">
+                            <i class="fas fa-arrow-right"></i>
+                            这是比较详细的教程视频：
+                        </div>
+                        <iframe class="faq-video"
+                            src="https://player.bilibili.com/player.html?isOutside=true&bvid=BV1nRKD6FEeX&high_quality=1&danmaku=0&muted=1&autoplay=0"
+                            border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- 鸣谢区 -->
+        <section class="section">
+            <div class="section-head reveal up">
+                <h2>鸣谢</h2>
+                <p>感谢所有帮到GooseHost的组织、服务</p>
+            </div>
+            <div class="thanks-grid reveal up">
+                <a class="thanks-logo" href="https://www.alibaba.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/alibaba.png" alt="Alibaba" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://www.cloudflare.com" target="_blank" rel="noopener noreferrer">
+                    <img src="https://cf-assets.www.cloudflare.com/slt3lc6tev37/1wf4qdGsPqa2UUSEoa4Yyg/3250a65f210bbb7062ab4dd9a9bdf213/logo-cloudflare-dark.svg" alt="Cloudflare" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://www.deepseek.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/DeepSeek.svg" alt="DeepSeek" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://www.dnshe.com" target="_blank" rel="noopener noreferrer">
+                    <img src="https://www.dnshe.com/logo1.png" alt="Dnshe" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://fontawesome.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/font_awesome.svg" alt="Font Awesome" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://github.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/github.svg" alt="GitHub" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://www.kimi.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/kimi.svg" alt="Kimi" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://openclaw.ai" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/openclaw.png" alt="OpenClaw" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://opencode.ai" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/opencode.svg" alt="opencode" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://seed.bytedance.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/seedream.svg" alt="Seedream" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://supabase.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/supabase.png" alt="Supabase" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://hunyuan.tencent.com" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/tencent_hunyuan.png" alt="腾讯混元" loading="lazy" decoding="async">
+                </a>
+                <a class="thanks-logo" href="https://www.workbuddy.cn" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/workbuddy.png" alt="WorkBuddy" loading="lazy" decoding="async">
+                </a>
+				<a class="thanks-logo" href="https://resend.com/" target="_blank" rel="noopener noreferrer">
+                    <img src="thanks/resend.svg" alt="resend" loading="lazy" decoding="async">
+                </a>
+            </div>
+        </section>
+
+        <!-- ===== 页脚 ===== -->
+        <footer class="footer">
+            © 2026 GooseHost · <a href="docs/">使用手册</a> · <a href="docs/?doc=terms">用户协议</a> · <a href="status">系统状态</a>
+            <p class="credit">由 <a href="https://goosecode.surge.sh" target="_blank" rel="noopener noreferrer">GooseCode</a>（Minecraft_goose）开发 · <a href="https://github.com/Minecraftgoose/GooseHost" target="_blank" rel="noopener noreferrer"><i class="fab fa-github"></i> GitHub</a></p>
+        </footer>
+
+    </div>
+
+<script src="app.js"></script>
+</body>
+</html>

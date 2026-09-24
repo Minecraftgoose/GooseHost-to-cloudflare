@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="查看 GooseHost 系统状态，了解各服务的运行情况。">
+    <title>系统状态 - GooseHost</title>
+    <link rel="icon" type="image/x-icon" href="../icons/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../icons/icon-16x16.png">
+    <link rel="apple-touch-icon" href="../icons/icon-180x180.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/status/style.css">
+</head>
+<body>
+    <div class="bg-layer" id="bgLayer"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-server"></i> GooseHost 系统状态</h1>
+            <div id="mainStatus" class="status-badge operational">
+                <span class="dot"></span>
+                <span id="mainStatusText">加载中...</span>
+            </div>
+            <div id="maintenanceBanner" class="maintenance-banner" style="display: none;">
+                <i class="fas fa-tools"></i>
+                <span id="maintenanceMessage"></span>
+            </div>
+        </div>
+
+        <div id="loadingBox" class="loading">
+            <div class="spinner"></div>
+            <span>正在检查服务状态...</span>
+        </div>
+
+        <div id="servicesBox" style="display: none;">
+            <!-- 认证功能 -->
+            <div class="section-title"><i class="fas fa-lock"></i> 认证功能</div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon auth"><i class="fas fa-sign-in-alt"></i></div>
+                            <div class="service-name">用户登录</div>
+                        </div>
+                        <div class="service-status up" id="status-login"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">POST /auth/login</div>
+                    <div class="service-desc">用户登录，获取访问令牌</div>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon auth"><i class="fas fa-user-plus"></i></div>
+                            <div class="service-name">用户注册</div>
+                        </div>
+                        <div class="service-status up" id="status-register"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">POST /auth/signup</div>
+                    <div class="service-desc">新用户注册账号</div>
+                </div>
+
+            </div>
+
+            <!-- 网站管理功能 -->
+            <div class="section-title"><i class="fas fa-globe"></i> 网站管理功能</div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon sites"><i class="fas fa-plus"></i></div>
+                            <div class="service-name">创建网站</div>
+                        </div>
+                        <div class="service-status up" id="status-create"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">POST /api/create</div>
+                    <div class="service-desc">创建新的静态网站（HTML/Markdown）</div>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon sites"><i class="fas fa-list"></i></div>
+                            <div class="service-name">网站列表</div>
+                        </div>
+                        <div class="service-status up" id="status-my-sites"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">GET /api/my-sites</div>
+                    <div class="service-desc">获取当前用户的网站列表</div>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon sites"><i class="fas fa-edit"></i></div>
+                            <div class="service-name">更新网站</div>
+                        </div>
+                        <div class="service-status up" id="status-update"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">POST /api/update</div>
+                    <div class="service-desc">更新网站内容或设置</div>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon sites"><i class="fas fa-trash"></i></div>
+                            <div class="service-name">删除网站</div>
+                        </div>
+                        <div class="service-status up" id="status-delete"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">POST /api/delete</div>
+                    <div class="service-desc">删除指定的网站</div>
+                </div>
+            </div>
+
+            <!-- 文件访问功能 -->
+            <div class="section-title"><i class="fas fa-folder-open"></i> 文件访问功能</div>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon file"><i class="fas fa-globe-americas"></i></div>
+                            <div class="service-name">访问HTML网站</div>
+                        </div>
+                        <div class="service-status up" id="status-serve-html"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">GET /s/:slug</div>
+                    <div class="service-desc">公开访问HTML静态网站</div>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-icon file"><i class="fas fa-file-alt"></i></div>
+                            <div class="service-name">访问Markdown</div>
+                        </div>
+                        <div class="service-status up" id="status-serve-md"><i class="fas fa-check-circle"></i> 正常</div>
+                    </div>
+                    <div class="service-path">GET /md/:slug</div>
+                    <div class="service-desc">公开访问Markdown渲染网站</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>由 <a href="https://goosecode.surge.sh">GooseCode</a> 提供支持 · <a href="https://host.goose.cc.cd" style="color: var(--accent);">返回首页</a></p>
+            <p class="last-update">最后更新: <span id="lastUpdate">-</span></p>
+        </div>
+    </div>
+
+    <script src="/status/app.js"></script>
+</body>
+</html>

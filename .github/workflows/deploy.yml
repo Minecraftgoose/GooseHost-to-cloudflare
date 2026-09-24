@@ -1,17 +1,29 @@
-name: Deploy GooseHost Worker
+name: Deploy GooseHost (Worker + Frontend)
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# 部署任务不建议被打断（避免推到一半的 Worker / Pages 版本），
+# 这里按分支串行排队而不是取消进行中的部署
 concurrency:
-  group: deploy-goosehost-worker
-  cancel-in-progress: true
+  group: deploy-goosehost-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  # ============================================================
+  # 1) 后端：Cloudflare Worker（gh-site-api-production）
+  # ============================================================
+  worker:
+    name: Deploy Worker
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,9 +32,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build (esbuild 打包 index.js -> worker.js)
         run: npm run build
@@ -33,20 +47,74 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           AI_API_KEYS: ${{ secrets.AI_API_KEYS }}
         run: |
-          echo -n "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL
-          echo -n "${{ secrets.SUPABASE_ANON_KEY }}" | npx wrangler secret put SUPABASE_ANON_KEY
-          echo -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-          echo -n "${{ secrets.CRON_SECRET }}" | npx wrangler secret put CRON_SECRET
+          printf '%s' "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL
+          printf '%s' "${{ secrets.SUPABASE_ANON_KEY }}" | npx wrangler secret put SUPABASE_ANON_KEY
+          printf '%s' "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+          printf '%s' "${{ secrets.CRON_SECRET }}" | npx wrangler secret put CRON_SECRET
 
           if [ -n "$AI_API_KEYS" ]; then
             echo "Pushing AI_API_KEYS..."
-            echo -n "$AI_API_KEYS" | npx wrangler secret put AI_API_KEYS
+            printf '%s' "$AI_API_KEYS" | npx wrangler secret put AI_API_KEYS
           else
             echo "AI_API_KEYS not set in repo secrets, skipping (keeping existing value on Cloudflare)"
           fi
 
       - name: Deploy to Cloudflare Workers
+        id: worker_deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+
+      - name: Worker deploy summary
+        run: |
+          echo "### Worker 部署完成" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 项目：`gh-site-api-production`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 分支：`${{ github.ref_name }}`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 2) 前端：Cloudflare Pages（gh-site-frontend，生产分支 main）
+  #    静态目录：front/（含 _headers / _redirects，Pages 原生支持）
+  # ============================================================
+  frontend:
+    name: Deploy Frontend (Pages)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@^4
+
+      - name: Ensure Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # 幂等：项目已存在时 create 会报错，忽略即可
+          npx wrangler pages project create gh-site-frontend --production-branch main \
+            || echo "Pages 项目已存在（或重复创建被拒绝），继续部署"
+
+      - name: Deploy to Cloudflare Pages
+        id: pages_deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler pages deploy front \
+            --project-name=gh-site-frontend \
+            --branch=main \
+            --commit-dirty=true
+
+      - name: Frontend deploy summary
+        run: |
+          echo "### 前端部署完成" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Pages 项目：`gh-site-frontend`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 生产分支：`main`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 部署目录：`front/`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 默认域名：https://gh-site-frontend.pages.dev" >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,0 @@
-node_modules/
-worker.js
-.wrangler/
-.dev.vars
-*.log
-.DS_Store
