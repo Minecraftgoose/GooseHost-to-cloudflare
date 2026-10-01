@@ -28,6 +28,6 @@
 
 # GooseHost-to-cloudflare 仓库
 
-本仓库用于将GooseHost后端源码上传至cloudflare
+本仓库用于将GooseHost源码上传至cloudflare
 
-你也可以在本仓库看见更新的GooseHost源码（即尚未发布的版本）
+你也可以在本仓库看见更新的GooseHost源码（即正在服务版本）
