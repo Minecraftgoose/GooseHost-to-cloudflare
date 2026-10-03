@@ -66,8 +66,28 @@ import {
 } from './play/index.js';
 
 // ===== Workers Entry =====
+function makeHandler(inner) {
+  return async (request, env) => {
+    try {
+      return await inner(request, env);
+    } catch (e) {
+      const url = (() => { try { return new URL(request.url); } catch { return null; } })();
+      const pathname = url ? url.pathname : '?';
+      console.error('[api] unhandled exception', {
+        path: pathname,
+        message: e && e.message,
+        stack: e && e.stack
+      });
+      // 兜底：必须带上 CORS 头，否则浏览器只会看到
+      // "CORS 头缺少 Access-Control-Allow-Origin"，把真实错误掩盖掉。
+      // 生产响应体只返回 requestId，堆栈走日志查。
+      const reqId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'n/a';
+      return jsonResp({ error: '服务端内部错误', requestId: reqId }, 500, getCorsHeaders(request));
+    }
+  };
+}
 export default {
-  async fetch(request, env) {
+  fetch: makeHandler(async (request, env) => {
     const url = new URL(request.url);
     const method = request.method;
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -408,5 +428,5 @@ export default {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
     });
-  }
+  })
 };
