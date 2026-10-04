@@ -140,7 +140,7 @@ body {
 .pg-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 32px;
     padding: 16px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -184,7 +184,7 @@ body {
 .pg-post {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 32px;
     padding: 16px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -306,7 +306,7 @@ body {
 /* ===== 详情 ===== */
 .pg-detail {
     background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px;
+    border-radius: 40px; padding: 20px;
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .pg-back {
@@ -397,7 +397,7 @@ body {
 .pg-modal-box {
     width: 100%; max-width: 520px; max-height: 86vh;
     background: #141a18; border: 1px solid var(--border);
-    border-radius: 12px; display: flex; flex-direction: column;
+    border-radius: 40px; display: flex; flex-direction: column;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
     animation: pgPop .22s cubic-bezier(0.22, 1, 0.36, 1);
 }

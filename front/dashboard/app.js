@@ -61,6 +61,36 @@
             copilot: '/dashboard/copilot'
         };
 
+        /**
+         * 进入部署页时，按当前选中的网站类型同步显示对应的输入区。
+         * 页面初次进入 / 从别的页切回来时，HTML / Markdown / 多文件三个输入区
+         * 的显示状态可能与单选框不一致（例如上次停留在 project 但面板已被重置），
+         * 这里统一按 :checked 重新对齐，避免「选了 MD 却显示 HTML 输入框」。
+         */
+        function updateEditorVisibility() {
+            // 以「高亮选中的类型卡片」为准；若没有高亮（首次进入）再看单选框。
+            const sel = document.querySelector('.type-option.selected input[name="siteType"]');
+            const checked = document.querySelector('.type-option input[name="siteType"]:checked');
+            const input = sel || checked;
+            const type = input ? input.value : 'html';
+
+            const groups = { html: 'html-input-group', md: 'md-input-group', project: 'project-input-group' };
+
+            Object.keys(groups).forEach(function (key) {
+                const group = document.getElementById(groups[key]);
+                if (group) group.style.display = (key === type) ? 'block' : 'none';
+            });
+
+            // 顺带把单选框与卡片高亮重新对齐，防止两者状态脱节
+            document.querySelectorAll('.type-option').forEach(function (opt) {
+                const radio = opt.querySelector('input[name="siteType"]');
+                if (!radio) return;
+                const on = radio.value === type;
+                radio.checked = on;
+                opt.classList.toggle('selected', on);
+            });
+        }
+
         function navigateTo(page) {
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             const navItem = document.querySelector(`[data-page="${page}"]`);
