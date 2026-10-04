@@ -1019,7 +1019,7 @@
         .loading i { animation: spin 1s linear infinite; color: #02ff8e; font-size: 1.5rem; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-        /* 水波纹点击效果 */
+        /* 水波纹点击效果（仅左侧边栏 .nav-item 使用） */
         .ripple {
             position: absolute;
             border-radius: 50%;
@@ -1034,13 +1034,6 @@
                 transform: scale(4);
                 opacity: 0;
             }
-        }
-
-        /* 带波纹的按钮 */
-        .ripple-btn {
-            position: relative;
-            overflow: hidden;
-            cursor: pointer;
         }
 
         /* ===== 快捷操作卡片 ===== */

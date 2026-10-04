@@ -1276,18 +1276,11 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         }
 
+        // 水波纹仅保留在左侧边栏导航项（.nav-item）上，其余按钮不再产生波纹
         document.addEventListener('click', function(e) {
-            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-                const btn = e.target.tagName === 'BUTTON' ? e.target : e.target.closest('button');
-                if (!btn.classList.contains('no-ripple')) {
-                    createRipple({ currentTarget: btn });
-                }
-            }
-            if (e.target.classList.contains('nav-item') || e.target.closest('.nav-item')) {
-                const nav = e.target.classList.contains('nav-item') ? e.target : e.target.closest('.nav-item');
-                if (!nav.classList.contains('no-ripple')) {
-                    createRipple({ currentTarget: nav });
-                }
+            const nav = e.target && e.target.closest ? e.target.closest('.nav-item') : null;
+            if (nav && !nav.classList.contains('no-ripple')) {
+                createRipple({ currentTarget: nav, clientX: e.clientX, clientY: e.clientY });
             }
         });
 

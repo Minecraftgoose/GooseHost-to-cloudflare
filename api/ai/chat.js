@@ -95,25 +95,6 @@ function zenPathFor(model) {
   }
   return '/chat/completions';
 }
-// 判定一个 endpoint 是否指向 OpenCode Zen。
-// 只看 host + path，不看 query/fragment——否则形如
-// https://other.com/?u=opencode.ai/zen 这种地址会被误判成 Zen 而套错校验规则。
-function isZenEndpoint(url) {
-  const raw = String(url || '').trim();
-  if (!raw) return false;
-  try {
-    const u = new URL(raw);
-    const host = u.hostname.toLowerCase();
-    if (host === 'zen.opencode.ai') return true;
-    return (host === 'opencode.ai' || host.endsWith('.opencode.ai'))
-      && /^\/zen(\/|$)/i.test(u.pathname);
-  } catch {
-    // 非合法 URL（用户随手填的片段）时退化为「host/path 部分」的字面匹配
-    const hostPath = raw.split(/[?#]/)[0];
-    return /\/\/(zen\.)?opencode\.ai\/zen(\/|$)/i.test(hostPath)
-      || /\/\/zen\.opencode\.ai(\/|$)/i.test(hostPath);
-  }
-}
 function resolveProvider(env) {
   const name = String(env.AI_PROVIDER || '').trim().toLowerCase();
   return name ? PROVIDERS[name] || null : null;
@@ -244,54 +225,20 @@ export async function handleAiChat(request, env, corsHeaders) {
     return jsonResp({ error: 'messages 不能为空' }, 400, corsHeaders);
   }
   const provider = resolveProvider(env);
-  // 「一键接入」透传：前端自定义模型把 endpoint / apiKey 放进请求体，走本代理转发。
-  // 预检实测（2026-09-22，Origin: https://example.com，请求头 authorization,content-type）：
-  //   · OpenCode Zen  https://opencode.ai/zen/v1/chat/completions → OPTIONS 404，
-  //     且无任何 Access-Control-Allow-* 响应头 → 浏览器直连必然被 CORS 拦，必须走代理；
-  //   · DeepSeek      https://api.deepseek.com/chat/completions → OPTIONS 200，
-  //     带 access-control-allow-origin/methods/headers → 直连预检其实是通过的。
-  //     仍统一走代理，是为了隐藏用户 Key、复用 Key 轮换与限流，而不是因为 CORS。
-  // 优先级：请求体 endpoint > AI_BASE_URL > provider 预设 > 默认 GLM
-  //
-  // ⚠️ Endpoint 归一化策略（2026-09 调整）：
-  // 前端已移除「自动补全 /chat/completions」，用户填的 URL 被视为【完整地址】，
-  // 后端必须【原样使用】，不再做路径假设——否则用户填第三方网关
-  // （如 /api/v1/chat、/completions、带子路径的代理）会被强制改坏。
-  // 这里只做：去尾斜杠 + 兼容旧数据（若仍以 /chat/completions 结尾则保留，不再剥离）。
-  const customEndpoint = String(payload.endpoint || '').trim().replace(/\/+$/, '');
-  // OpenCode Zen 识别：Endpoint 命中 opencode.ai/zen 时，自动套用 opencode-zen
-  // provider 预设（免费模型列表、计费提示），无需前端额外传 provider 名。
-  // 仅做路由匹配，不读取、不持久化用户的 API Key。
-  // 注意：用【原始 endpoint】匹配，因为用户可能填的是完整 URL
-  // （如 https://opencode.ai/zen/v1/chat/completions），只要包含路径片段即命中。
-  const zenDetected = isZenEndpoint(customEndpoint);
-  const zenProvider = zenDetected ? PROVIDERS['opencode-zen'] : null;
-  const activeProvider = provider || zenProvider;
-  // base：用户填的自定义 endpoint 的处理——
-  // ⚠️ 2026-09 调整：前端已移除「自动补全 /chat/completions」，用户填的 URL 被视为
-  // 【完整请求地址】，后端【原样使用，绝不追加任何路径】。
-  // 理由：自定义模型端点可能是任意 OpenAI 兼容网关（/api/v1/chat、/completions、
-  // 带子路径的代理、第三方中转），若后端再硬拼 /chat/completions 会把这些地址改坏。
-  // 一键接入（PRESETS）在前端就已填入完整地址（如 https://opencode.ai/zen/v1/chat/completions），
-  // 用户手动填时也按「填什么请求什么」处理。仅做去尾斜杠规范化。
-  const customBase = customEndpoint ? customEndpoint.replace(/\/$/, '') : '';
-  const base = customBase
-    ? customBase
-    : (env.AI_BASE_URL || (provider && provider.baseURL) || DEFAULT_BASE).replace(/\/$/, '');
-  // 前端传了自定义 key（用户自己的 DeepSeek Key）时，以它作为唯一 key；
-  // 否则沿用服务端配置的 key 轮换列表。
-  const customKey = String(payload.apiKey || '').trim();
-  const keyList = customKey ? [customKey] : serverKeyList;
+  // 上游地址与 API Key 一律由服务端环境变量决定（AI_BASE_URL / AI_PROVIDER / AI_API_KEYS / AI_MODEL），
+  // 请求体中的 endpoint / apiKey / model 不再生效——前端已移除自定义模型功能。
+  // 仍统一走代理（而非浏览器直连）是为了隐藏服务端 Key、复用 Key 轮换与限流。
+  const activeProvider = provider;
+  const base = (env.AI_BASE_URL || (provider && provider.baseURL) || DEFAULT_BASE).replace(/\/$/, '');
+  const keyList = serverKeyList;
   if (!keyList.length) {
     return jsonResp({ error: '服务端未配置 AI_API_KEYS 或 AI_API_KEY' }, 500, corsHeaders);
   }
-  const models = customEndpoint || customKey
-    ? (String(payload.model || '').trim() ? [String(payload.model).trim()] : (activeProvider ? activeProvider.models : modelChain(env)))
-    : modelChain(env);
+  const models = modelChain(env);
   // OpenCode Zen：本代理只会发 Chat Completions 格式的请求体，
   // 但 Zen 的 GPT / Grok / Claude / Qwen / Gemini / Jev 走的是别的 endpoint 和别的协议。
   // 与其静默打到 /chat/completions 拿一个难懂的错误，不如直接告诉用户该用哪个端点。
-  if (zenDetected || resolveProvider(env) === PROVIDERS['opencode-zen']) {
+  if (resolveProvider(env) === PROVIDERS['opencode-zen']) {
     const unsupported = models
       .map(m => ({ model: m, path: zenPathFor(m) }))
       .filter(x => x.path !== '/chat/completions');
@@ -334,14 +281,10 @@ export async function handleAiChat(request, env, corsHeaders) {
         body: JSON.stringify(buildBody(model, payload, env, wantStream, activeProvider))
       };
       const thisTimeout = Math.min(upstreamTimeout, Math.max(remain(), 1000));
-      // 组装最终上游 URL：
-      //   · 用户自定义 endpoint（customEndpoint）→ 视为完整地址，原样请求；
-      //   · 服务端 base（AI_BASE_URL / provider 预设 / 默认 GLM）→ 裸 base，补 /chat/completions。
+      // 组装最终上游 URL：服务端 base（AI_BASE_URL / provider 预设 / 默认 GLM）→ 裸 base，补 /chat/completions。
       // 例外：OpenCode Zen 的 endpoint 按模型族区分（见 zenPathFor），
       //   若命中的是 /chat/completions 之外的模型族，前面已做校验拦截，这里不会走到。
-      const upstreamUrl = customEndpoint
-        ? base
-        : (/\/chat\/completions$/i.test(base) ? base : base + '/chat/completions');
+      const upstreamUrl = /\/chat\/completions$/i.test(base) ? base : base + '/chat/completions';
       try {
         if (wantStream) {
           const r = await fetchUpstream(upstreamUrl, opts, thisTimeout);
