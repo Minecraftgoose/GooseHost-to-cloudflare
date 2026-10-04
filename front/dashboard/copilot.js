@@ -1719,6 +1719,10 @@
             ChatStore.save(history);
         }
     }
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
     function buildPage() {
         if (mounted) return;
         var content = document.querySelector('.content');
