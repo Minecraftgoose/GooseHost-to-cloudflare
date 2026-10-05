@@ -47,40 +47,26 @@
     <canvas id="flagDots" class="flag-dots" aria-hidden="true"></canvas>
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-        <div class="navbar-left">
-            <button class="menu-toggle" id="menuToggle" onclick="toggleSidebarDesktop()">
-                <i class="fas fa-outdent"></i>
-            </button>
-            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleSidebarMobile()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="navbar-icon">
-                <img src="/logo.svg" height="36" alt="Logo">
-            </div>
+        <!-- 竖屏：左侧 SVG Logo -->
+        <div class="navbar-icon">
+            <img src="/logo.svg" height="28" alt="GooseHost">
         </div>
-    </nav>
 
-    <div class="sidebar-overlay" onclick="toggleSidebarMobile()"></div>
-
-    <!-- 主布局 -->
-    <div class="main-layout" id="mainContent" onclick="closeSidebarOnMobile(event)">
-        <!-- 侧边栏 -->
-        <aside class="sidebar" id="sidebar">
+        <!-- ===== 导航菜单（宽屏常驻横排 / 竖屏由三道杠展开） ===== -->
+        <div class="sidebar" id="sidebar" role="menu" aria-label="主菜单">
             <div class="nav-section">
                 <div class="nav-section-title">主菜单</div>
-                <div class="nav-item active" data-page="overview" onclick="navigateTo('overview')" role="button" tabindex="0">
-                    <i class="fas fa-home"></i>
+                <div class="nav-item active" data-page="overview" onclick="navigateTo('overview')" role="button" tabindex="0" title="概览"><i class="fas fa-home"></i>
                     <span>概览</span>
                 </div>
-                <div class="nav-item" data-page="deploy" onclick="navigateTo('deploy')" role="button" tabindex="0">
-                    <i class="fas fa-rocket"></i>
+                <div class="nav-item" data-page="deploy" onclick="navigateTo('deploy')" role="button" tabindex="0" title="部署"><i class="fas fa-rocket"></i>
                     <span>部署</span>
                 </div>
-                <div class="nav-item" data-page="copilot" onclick="navigateTo('copilot')" role="button" tabindex="0">
+                <div class="nav-item" title="AI Copilot" data-page="copilot" onclick="navigateTo('copilot')" role="button" tabindex="0">
                     <!--
                       Bot 图标：与 copilot.js 的 botIcon() **图形完全一致**，
                       只是尺寸不同（这里 18px 匹配 nav-item 的 1rem 图标槽位）。
-                      必须内联而非 JS 注入 —— 侧边栏首屏就要渲染，
+                      必须内联而非 JS 注入 —— 导航栏菜单首屏就要渲染，
                       靠 JS 替换会先闪一下旧图标。
                       图形一致性由 tests/test-bot-icon.mjs 守着。
                     -->
@@ -94,12 +80,10 @@
                     </svg>
                     <span>AI Copilot</span>
                 </div>
-                <div class="nav-item" data-page="sites" onclick="navigateTo('sites')" role="button" tabindex="0">
-                    <i class="fas fa-globe"></i>
+                <div class="nav-item" data-page="sites" onclick="navigateTo('sites')" role="button" tabindex="0" title="我的网站"><i class="fas fa-globe"></i>
                     <span>我的网站</span>
                 </div>
-                <div class="nav-item" onclick="location.href='/playground/'" role="button" tabindex="0">
-                    <i class="fas fa-comments"></i>
+                <div class="nav-item" onclick="location.href='/playground/'" role="button" tabindex="0" title="广场"><i class="fas fa-comments"></i>
                     <span>广场</span>
                 </div>
             </div>
@@ -108,20 +92,29 @@
 
             <div class="nav-section">
                 <div class="nav-section-title">设置</div>
-                <div class="nav-item" data-page="preferences" onclick="navigateTo('preferences')" role="button" tabindex="0">
-                    <i class="fas fa-sliders-h"></i>
+                <div class="nav-item" data-page="preferences" onclick="navigateTo('preferences')" role="button" tabindex="0" title="偏好设置"><i class="fas fa-sliders-h"></i>
                     <span>偏好设置</span>
                 </div>
-                <div class="nav-item" data-page="account" onclick="navigateTo('account')" role="button" tabindex="0">
-                    <i class="fas fa-user-circle"></i>
+                <div class="nav-item" data-page="account" onclick="navigateTo('account')" role="button" tabindex="0" title="账户"><i class="fas fa-user-circle"></i>
                     <span>账户</span>
                 </div>
-                <a href="/status" class="nav-item" style="text-decoration: none;">
+                <a href="/status" class="nav-item" title="系统状态" style="text-decoration: none;">
                     <i class="fas fa-server"></i>
                     <span>系统状态</span>
                 </a>
             </div>
-        </aside>
+        </div>
+
+        <!-- 竖屏：右侧三道杠 -->
+        <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()" aria-label="打开菜单" aria-expanded="false" aria-controls="sidebar">
+            <i class="fas fa-bars"></i>
+        </button>
+    </nav>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- 主布局 -->
+    <div class="main-layout" id="mainContent">
 
         <!-- 主内容区 -->
         <main class="content">

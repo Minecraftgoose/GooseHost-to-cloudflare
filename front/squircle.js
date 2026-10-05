@@ -1,13 +1,3 @@
-/*!
- * squircle.js — GooseHost「大卡片」Figma 风格平滑圆角
- *
- * · 只处理大卡片 / 弹窗 / 侧边栏与面板容器；按钮、输入框、头像、标签等小元素保持原样，
- *   沿用它们自己的 CSS border-radius。
- * · 平滑度固定 cornerSmoothing = 1.00（Figma「平滑圆角」拉满）。
- * · 圆角半径沿用元素自身 CSS 的 border-radius，不改变设计尺寸。
- * · 形状算法直接用 figma-squircle（https://github.com/tienphaw/figma-squircle，MIT）。
- * · CDN 加载失败时静默跳过，页面保持原有普通圆角，不影响任何功能。
- * --------------------------------------------------------------------------- */
 const SQUIRCLE_CDN = 'https://esm.sh/figma-squircle@1.1.0';
 
 let getSvgPath;

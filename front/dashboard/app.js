@@ -167,58 +167,58 @@
         document.addEventListener('DOMContentLoaded', parseRoute);
         if (document.readyState !== 'loading') parseRoute();
 
-        function closeSidebarOnMobile(event) {
-            if (window.innerWidth <= 768) {
-                const target = event.target;
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar && sidebar.contains(target)) {
-                    return;
-                }
-                closeSidebar();
-            }
+        /* ===== 导航菜单展开/收起 =====
+           横屏（>768px）：菜单常驻导航栏，按钮隐藏，这些函数无副作用。
+           竖屏（<=768px）：三道杠点击后展开竖排下拉面板。
+           路由跳转处（navigateTo / showSiteDetail）会调用 closeSidebar()，保持兼容。 */
+        const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+
+        function setMenuIcon(open) {
+            const btn = document.getElementById('menuToggle');
+            if (!btn) return;
+            btn.innerHTML = open ? '<i class="fas fa-xmark"></i>' : '<i class="fas fa-bars"></i>';
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.toggle('active', open);
         }
 
         function closeSidebar() {
             const sidebar = document.getElementById('sidebar');
-            sidebar.classList.remove('open');
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('collapsed');
-            }
+            if (sidebar) sidebar.classList.remove('open');
+            setMenuIcon(false);
         }
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            if (sidebar.classList.contains('open')) {
-                closeSidebar();
-            } else {
-                sidebar.classList.add('open');
-                if (window.innerWidth <= 768) {
-                    sidebar.classList.remove('collapsed');
-                }
-            }
+            if (!sidebar) return;
+            const open = !sidebar.classList.contains('open');
+            sidebar.classList.toggle('open', open);
+            setMenuIcon(open);
         }
 
-        function toggleSidebarDesktop() {
+        // 兼容旧调用名
+        function toggleSidebarDesktop() { toggleSidebar(); }
+        function toggleSidebarMobile() { toggleSidebar(); }
+
+        // 竖屏下：点击面板外 / 按 ESC 关闭
+        document.addEventListener('click', function (e) {
             const sidebar = document.getElementById('sidebar');
-            const menuToggle = document.getElementById('menuToggle');
-            const content = document.querySelector('.content');
-
-            if (sidebar.classList.contains('collapsed')) {
-                sidebar.classList.remove('collapsed');
-                content.classList.remove('sidebar-collapsed');
-                menuToggle.innerHTML = '<i class="fas fa-outdent"></i>';
-            } else {
-                sidebar.classList.add('collapsed');
-                content.classList.add('sidebar-collapsed');
-                menuToggle.innerHTML = '<i class="fas fa-indent"></i>';
-            }
-        }
-
-        function toggleSidebarMobile() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.remove('collapsed');
-            sidebar.classList.toggle('open');
-        }
+            if (!sidebar || !sidebar.classList.contains('open')) return;
+            if (sidebar.contains(e.target)) return;
+            if (e.target.closest && e.target.closest('.menu-toggle')) return;
+            closeSidebar();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeSidebar();
+        });
+        // 从竖屏转回横屏时清掉展开态，避免残留遮罩
+        window.addEventListener('resize', function () {
+            if (!MOBILE_MQ.matches) closeSidebar();
+        });
+        MOBILE_MQ.addEventListener('change', function (e) {
+            if (!e.matches) closeSidebar();
+        });
 
         function showToast(msg, type = 'success') {
             const t = document.getElementById('toast');
