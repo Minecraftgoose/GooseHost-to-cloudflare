@@ -1122,8 +1122,10 @@
             }
         }
 
-        /* ===== 竖屏（<=768px）：左侧 SVG Logo + 右侧三道杠，菜单竖排下拉 ===== */
-        @media (max-width: 768px) {
+        /* ===== 竖屏：左侧 SVG Logo + 右侧三道杠，菜单竖排下拉 =====
+           注意：用 orientation: portrait 限定，
+           手机横屏（如 667x375）宽度虽 <768 但仍是横屏，应走常驻横排菜单，不出现三道杠。 */
+        @media (max-width: 768px) and (orientation: portrait) {
             .navbar {
                 justify-content: space-between;
                 padding: 0 1rem;
@@ -1224,7 +1226,20 @@
                 visibility: visible;
                 pointer-events: auto;
             }
+        }
 
+        /* 小屏横屏（如手机横放）：菜单常驻横排，紧凑 + 可横滑 */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .navbar { padding: 0 0.75rem; height: 52px; }
+            .main-layout { padding-top: 52px; }
+            .nav-item { height: 34px; padding: 0 0.55rem; font-size: 0.8rem; gap: 0.35rem; }
+            .nav-divider { margin: 0 0.15rem; }
+            .content { padding: 1.25rem 1rem; }
+        }
+
+        @media (max-width: 768px) {
+            /* 窄屏通用：内容列贴边等 */
+            .main-layout { padding-left: 0; padding-right: 0; }
             .content {
                 margin-left: 0;
                 padding: 1.5rem 1rem;
@@ -1258,8 +1273,8 @@
             }
         }
 
-        @media (max-width: 600px) {
-            /* 极窄屏：下拉菜单项略微收紧 */
+        @media (max-width: 600px) and (orientation: portrait) {
+            /* 极窄竖屏：下拉菜单项略微收紧，Logo 缩小 */
             .nav-item { height: 42px; padding: 0 0.75rem; }
             .navbar-icon img { height: 24px; }
         }

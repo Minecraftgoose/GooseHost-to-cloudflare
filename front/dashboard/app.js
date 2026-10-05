@@ -168,10 +168,39 @@
         if (document.readyState !== 'loading') parseRoute();
 
         /* ===== 导航菜单展开/收起 =====
-           横屏（>768px）：菜单常驻导航栏，按钮隐藏，这些函数无副作用。
-           竖屏（<=768px）：三道杠点击后展开竖排下拉面板。
+           两种形态由「屏幕方向 + 宽度」决定，CSS 与 JS 用同一条查询，避免只改一边：
+
+           横屏（含手机横放，如 844x390）：菜单常驻导航栏横排。
+               → Logo 与三道杠 display:none，且按钮 disabled + aria-hidden，
+                 点击不触发任何逻辑，也不会被 Tab 聚焦。
+           竖屏（窄屏 + 纵向，如 390x844）：左侧 Logo、右侧三道杠，点击展开竖排下拉。
+
            路由跳转处（navigateTo / showSiteDetail）会调用 closeSidebar()，保持兼容。 */
-        const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+        const NAV_PORTRAIT_MQ = window.matchMedia('(max-width: 768px) and (orientation: portrait)');
+        const isPortraitNav = () => NAV_PORTRAIT_MQ.matches;
+
+        /* 按当前方向同步 Logo / 三道杠 / 遮罩的可用状态。
+           横屏下按钮彻底失活（display:none 只管外观，disabled 才管交互）。 */
+        function syncNavMode() {
+            const portrait = isPortraitNav();
+            const btn = document.getElementById('menuToggle');
+            const logo = document.getElementById('navLogo');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (btn) {
+                btn.disabled = !portrait;
+                btn.setAttribute('aria-hidden', portrait ? 'false' : 'true');
+                btn.tabIndex = portrait ? 0 : -1;
+            }
+            if (logo) logo.setAttribute('aria-hidden', portrait ? 'false' : 'true');
+            if (overlay && !portrait) overlay.classList.remove('active');
+            // 横屏菜单常驻，清掉可能残留的展开态
+            if (!portrait) {
+                const sb = document.getElementById('sidebar');
+                if (sb) sb.classList.remove('open');
+            }
+            if (btn) setMenuIcon(portrait && btn.getAttribute('aria-expanded') === 'true');
+        }
 
         function setMenuIcon(open) {
             const btn = document.getElementById('menuToggle');
@@ -180,7 +209,7 @@
             btn.setAttribute('aria-expanded', open ? 'true' : 'false');
             btn.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
             const overlay = document.getElementById('sidebarOverlay');
-            if (overlay) overlay.classList.toggle('active', open);
+            if (overlay) overlay.classList.toggle('active', open && isPortraitNav());
         }
 
         function closeSidebar() {
@@ -189,7 +218,9 @@
             setMenuIcon(false);
         }
 
+        /* 三道杠的点击入口：横屏直接短路，不产生任何展开状态 */
         function toggleSidebar() {
+            if (!isPortraitNav()) return;
             const sidebar = document.getElementById('sidebar');
             if (!sidebar) return;
             const open = !sidebar.classList.contains('open');
@@ -212,13 +243,18 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closeSidebar();
         });
-        // 从竖屏转回横屏时清掉展开态，避免残留遮罩
-        window.addEventListener('resize', function () {
-            if (!MOBILE_MQ.matches) closeSidebar();
-        });
-        MOBILE_MQ.addEventListener('change', function (e) {
-            if (!e.matches) closeSidebar();
-        });
+
+        // 方向 / 尺寸变化：重新同步模式，并清掉竖屏残留的展开态与遮罩
+        function onNavModeChange() { syncNavMode(); }
+        window.addEventListener('resize', onNavModeChange);
+        window.addEventListener('orientationchange', onNavModeChange);
+        if (NAV_PORTRAIT_MQ.addEventListener) {
+            NAV_PORTRAIT_MQ.addEventListener('change', onNavModeChange);
+        } else if (NAV_PORTRAIT_MQ.addListener) {
+            NAV_PORTRAIT_MQ.addListener(onNavModeChange);
+        }
+        syncNavMode(); // 首屏立即按当前方向初始化
+        document.addEventListener('DOMContentLoaded', syncNavMode); // DOM 就绪后再对齐一次
 
         function showToast(msg, type = 'success') {
             const t = document.getElementById('toast');
@@ -1437,6 +1473,3 @@
 
         loadSites();
 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(function() {});
-        }
