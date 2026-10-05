@@ -693,80 +693,20 @@
                 btn.innerHTML = '<i class="fas fa-rocket"></i> 部署网站';
             }
         }
-        let refreshPromise = null;
+        /* ===== 会话续期与鉴权请求 =====
+           原本这里内联了一份 refreshSession / apiFetch，存在并发刷新踩踏：
+           Supabase 的 refresh_token 是一次性的（Rotation），并发刷新会让后来的
+           请求拿到 invalid_grant，旧代码随即删掉 sb_refresh_token，导致反复掉线。
+           现已统一收敛到 /auth-session.js（GHAuth），具备：
+             · 页面内 single-flight（并发合流，只发一次 refresh）
+             · 跨标签页锁 + BroadcastChannel（多标签页排队，不互相作废）
+             · 失败分类（网络/限流可重试，仅确认失效才登出）
+           下面保留同名函数指向 GHAuth，确保既有的 refreshSession / apiFetch 调用无损。 */
+        // 用函数声明而非 const 赋值：函数声明会提升，避免顶层代码出现 TDZ 报错
+        function refreshSession(force) { return GHAuth.refreshSession(force); }
+        function apiFetch(url, options) { return GHAuth.apiFetch(url, options); }
+        function jwtExpiry(token) { return GHAuth.jwtExpiry(token); }
 
-        function jwtExpiry(token) {
-            try {
-                const parts = token.split('.');
-                if (parts.length !== 3) return null;
-                const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-                const pad = '='.repeat((4 - (b64.length % 4)) % 4);
-                const binary = atob(b64 + pad);
-                const payload = JSON.parse(new TextDecoder().decode(new Uint8Array([...binary].map(c => c.charCodeAt(0)))));
-                return payload.exp ? payload.exp * 1000 : null;
-            } catch { return null; }
-        }
-
-        async function refreshSession() {
-            const rt = localStorage.getItem('sb_refresh_token');
-            if (!rt) return false;
-            try {
-                const res = await fetch(API_URL + '/auth/refresh', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refresh_token: rt })
-                });
-                const data = await res.json();
-                if (res.ok && data.access_token) {
-                    localStorage.setItem('sb_token', data.access_token);
-                    if (data.refresh_token) localStorage.setItem('sb_refresh_token', data.refresh_token);
-                    if (data.user) localStorage.setItem('sb_user', JSON.stringify(data.user));
-                    return true;
-                }
-                localStorage.removeItem('sb_refresh_token');
-                return false;
-            } catch {
-                return false;
-            }
-        }
-
-        async function apiFetch(url, options = {}) {
-            const cur = localStorage.getItem('sb_token');
-            const exp = cur ? jwtExpiry(cur) : null;
-            if (cur && exp && (exp - Date.now() < 5 * 60 * 1000)) {
-                await refreshSession();
-            }
-            const latest = localStorage.getItem('sb_token');
-            const hdr = new Headers(options.headers || {});
-            if (latest) hdr.set('Authorization', 'Bearer ' + latest);
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
-            try {
-                let res = await fetch(url, { ...options, headers: hdr, signal: controller.signal });
-                if (res.status === 401 && localStorage.getItem('sb_refresh_token')) {
-                    const ok = await refreshSession();
-                    if (ok) {
-                        const nt = localStorage.getItem('sb_token');
-                        const hdr2 = new Headers(options.headers || {});
-                        if (nt) hdr2.set('Authorization', 'Bearer ' + nt);
-                        res = await fetch(url, { ...options, headers: hdr2, signal: controller.signal });
-                    }
-                }
-                clearTimeout(timeout);
-                if (res.status === 401) {
-                    localStorage.removeItem('sb_token');
-                    localStorage.removeItem('sb_user');
-                    localStorage.removeItem('sb_refresh_token');
-                    location.href = '/login/';
-                    throw new Error('Unauthorized');
-                }
-                return res;
-            } catch (e) {
-                clearTimeout(timeout);
-                if (e.name === 'AbortError') throw new Error('请求超时');
-                throw e;
-            }
-        }
 
         function escapeHtml(str) {
             if (!str) return '';
