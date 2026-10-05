@@ -125,7 +125,7 @@
         .maintenance-banner {
             background: rgba(255, 165, 0, 0.15);
             border: 1px solid rgba(255, 165, 0, 0.4);
-            border-radius: 6px;
+            border-radius: 24px;
             padding: 1rem;
             margin-top: 1.5rem;
             text-align: center;
@@ -180,7 +180,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 6px;
+            border-radius: 16px;
             font-size: 1.1rem;
         }
         .service-icon.auth { background: rgba(2, 255, 142, 0.15); color: #02ff8e; }

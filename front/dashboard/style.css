@@ -381,7 +381,7 @@
             width: 48px;
             height: 48px;
             background: rgba(2, 255, 142, 0.15);
-            border-radius: 6px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -520,7 +520,7 @@
         /* ===== 文件拖拽上传 ===== */
         .file-drop-zone {
             border: 2px dashed rgba(2, 255, 142, 0.3);
-            border-radius: 6px;
+            border-radius: 24px;
             padding: 1.5rem;
             text-align: center;
             margin-bottom: 1rem;
@@ -816,7 +816,7 @@
             left: 50%;
             transform: translateX(-50%) translateY(100px);
             padding: 1rem 1.5rem;
-            border-radius: 6px;
+            border-radius: 24px;
             color: #fff;
             font-size: 0.9rem;
             opacity: 0;
@@ -968,7 +968,7 @@
             background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
             background-size: 200% 100%;
             animation: skeleton-shimmer 1.5s infinite;
-            border-radius: 6px;
+            border-radius: 40px;
         }
         @keyframes skeleton-shimmer {
             0% { background-position: 200% 0; }
@@ -1050,7 +1050,7 @@
             gap: 0.75rem;
             padding: 1.5rem;
             background: rgba(0, 0, 0, 0.2);
-            border-radius: 6px;
+            border-radius: 24px;
             text-decoration: none;
             color: #fff;
             transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1318,7 +1318,7 @@
             max-height: 300px;
             overflow-y: auto;
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 8px;
+            border-radius: 24px;
             background: rgba(0, 0, 0, 0.2);
         }
         .detail-file {
@@ -1389,7 +1389,7 @@
             padding: 4px;
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid rgba(2, 255, 142, 0.15);
-            border-radius: 8px;
+            border-radius: 24px;
         }
         .type-option {
             flex: 1;
@@ -1401,7 +1401,7 @@
             padding: 0.9rem 0.5rem 0.7rem;
             background: transparent;
             border: none;
-            border-radius: 8px;
+            border-radius: 20px;
             cursor: pointer;
             transition: background 0.2s, color 0.2s;
         }
@@ -1614,7 +1614,7 @@
             color: rgba(255, 255, 255, 0.85);
             background: linear-gradient(135deg, rgba(2, 255, 142, 0.12), rgba(2, 255, 142, 0.04));
             border: 1px solid rgba(2, 255, 142, 0.28);
-            border-radius: 8px;
+            border-radius: 24px;
             overflow: hidden;
             max-width: 100%;
         }

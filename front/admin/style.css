@@ -402,7 +402,7 @@
             bottom: 24px;
             right: 24px;
             padding: 12px 20px;
-            border-radius: var(--radius);
+            border-radius: 24px;
             font-size: 13px;
             font-weight: 500;
             opacity: 0;
