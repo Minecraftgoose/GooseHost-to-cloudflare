@@ -19,12 +19,9 @@
        生图与建站一样是「工具」，由模型自己判断要不要调。
        所以这里只描述模型本身，不再有 caps / 模式 / 开关。 */
     var ENGINES = [
-        { id: 'goose',       label: 'GooseHost Copilot', desc: '默认模型 · 建站工具链最稳',
-          provider: null,    model: null,              tools: true },
-        { id: 'agnes-flash', label: 'Agnes Flash',      desc: '响应更快 · 通用对话',
-          provider: 'agnes', model: 'agnes-2.5-flash', tools: true },
-        { id: 'agnes-pro',   label: 'Agnes Pro',        desc: '推理更强 · 通用对话',
-          provider: 'agnes', model: 'agnes-2.5-pro',   tools: true }
+        { id: 'goose',       label: 'GooseHost Copilot', provider: null,    model: null,              tools: true },
+        { id: 'agnes-flash', label: 'Agnes Flash',      provider: 'agnes', model: 'agnes-2.5-flash', tools: true },
+        { id: 'agnes-pro',   label: 'Agnes Pro',        provider: 'agnes', model: 'agnes-2.5-pro',   tools: true }
     ];
     var ENGINE_KEY = 'cop_engine_v1';
     var currentEngine = ENGINES[0];
@@ -74,19 +71,12 @@
                 var on = e.id === currentEngine.id;
                 return '<button type="button" class="cop-model-item' + (on ? ' active' : '') + '" data-engine="' + esc(e.id) + '">'
                     + '<span class="cop-model-dot"></span>'
-                    + '<span class="cop-model-meta"><b>' + esc(e.label) + '</b><i>' + esc(e.desc) + '</i></span>'
+                    + '<span class="cop-model-name">' + esc(e.label) + '</span>'
                     + (on ? '<span class="cop-model-check"><i class="fas fa-check"></i></span>' : '')
                     + '</button>';
             }).join('');
 
-            // 能力说明只读：联网检索 / 深度思考默认开启，生图由模型按需调用工具
-            var caps = '<div class="cop-model-div"></div>'
-                + '<div class="cop-model-note">'
-                + '<div><i class="fas fa-globe"></i> 联网检索 · 默认开启</div>'
-                + '<div><i class="fas fa-image"></i> 生图 · 说一声就画</div>'
-                + '</div>';
-            panel.innerHTML = '<div class="cop-model-title">选择模型</div>' + list + caps
-                + '<div class="cop-model-foot">模型密钥保存在服务端，前端不接触</div>';
+            panel.innerHTML = '<div class="cop-model-title">选择模型</div>' + list;
 
             Array.prototype.forEach.call(panel.querySelectorAll('.cop-model-item'), function (b) {
                 b.onclick = function (ev) {

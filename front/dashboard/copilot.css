@@ -279,15 +279,16 @@
     background: var(--gai-brand);
     box-shadow: 0 0 8px rgba(2, 255, 142, 0.65);
 }
-.cop-model-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.cop-model-meta b { font-size: 13px; font-weight: 600; }
-.cop-model-meta i {
-    font-style: normal;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.34);
-    margin-top: 2px;
-}
-.cop-model-check { color: var(--gai-brand); font-size: 12px; flex-shrink: 0; }
+.cop-model-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.88);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+}.cop-model-check { color: var(--gai-brand); font-size: 12px; flex-shrink: 0; }
 
 .cop-model-div {
     height: 1px;
@@ -348,34 +349,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.cop-model-note {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 2px 2px 4px;
-}
-.cop-model-note > div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.42);
-}
-.cop-model-note i {
-    width: 13px;
-    text-align: center;
-    color: var(--gai-brand);
-    opacity: .75;
-    flex-shrink: 0;
-}
 
-.cop-model-foot {
-    margin-top: 9px;
-    padding-top: 7px;
-    border-top: 1px dashed rgba(2, 255, 142, 0.14);
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.26);
-}
 
 .cop-tool-right {
     display: flex;
@@ -856,7 +830,10 @@ body.cop-fullscreen #announcementBanner {
     .cop-input-wrap { border-radius: var(--gai-radius-sm); }
     .cop-messages { padding: 14px 10px; gap: 16px; }
     .cop-user-bubble { max-width: 85%; }
-    .cop-tool-left { display: none; }
+    /* 以前这里把 .cop-tool-left 整条隐藏，导致挂在其中的「模型选择器」在竖屏彻底消失，
+       手机用户根本没法换模型。改成只隐藏普通快捷 chip，保留模型入口。 */
+    .cop-tool-left { display: flex; flex: 0 0 auto; overflow: visible; }
+    .cop-tool-left > .cop-tool-chip:not(.cop-model-chip) { display: none; }
     .cop-overlay.show { display: block; opacity: 1; }
     .cop-drawer-close { display: flex; }
     .cop-right-panel {
