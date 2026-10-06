@@ -786,7 +786,39 @@
             min-height: 0;            /* 允许在 flex 容器里正确收缩并滚动 */
             overflow-y: auto;
             overscroll-behavior: contain;
+            /* 纵向 flex：子块默认按内容高度排列（不会被动拉伸），
+               只有标了 --fill 的弹窗才会让输入区吃掉剩余空间 */
+            display: flex;
+            flex-direction: column;
         }
+
+        /* ===== 编辑类弹窗：输入区自适应剩余高度 =====
+           问题：textarea 写死 min-height（HTML/全局 300px、项目文件 380px），
+           在稍矮的屏幕（视口高 ≲600px）上会把弹窗顶出几像素，
+           于是内容区冒出一条滚动条 —— 看着像内容被"挤"出来了。
+           解法：让输入区随可用高度伸缩，而不是固定高度外撑。 */
+        .modal-body--fill .form-group {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        /* 高度直接用视口计算，而不是靠 flex 收缩链。
+           为什么不用 flex：编辑面板外面还套了一层 #html-editor-panel，
+           而 JS 切换 HTML/MD 面板时会写死 inline `display: block`，
+           会覆盖掉 CSS 里的 display:flex，导致内层收缩链断掉（实测无效）。
+           clamp 不受 display 影响，也不依赖嵌套结构，最稳。
+           系数 310 / 258 = 实测「除输入区以外的固定占用 + 安全余量」。 */
+        .modal-body--fill textarea {
+            flex: none;
+            min-height: 0;                                  /* 覆盖全局的 300px，否则 clamp 下限失效 */
+            height: clamp(140px, calc(100vh - 310px), 300px);
+        }
+        /* 文件编辑框内容更长，给更高的默认高度 */
+        .modal-body--fill #projFileContent {
+            height: clamp(140px, calc(100vh - 258px), 380px);
+        }
+        .modal-body--fill .drop-hint { flex: none; }
 
         .modal-footer {
             display: flex;
@@ -1695,28 +1727,23 @@
         }
 
         /* ===== API 密钥列表 ===== */
+        /* 列表行：不再做「卡片里套卡片」，改用贯穿内容列的分隔行。
+           之前给条目加背景框 + 左右 padding，会把里面的吊销按钮往里推约 15px，
+           与同页「修改」「新建密钥」的右边缘对不上；
+           用负 margin 抵消又会让行框超出内容列、按钮贴死在边框上（像被吞掉一半）。
+           现在行框宽度 = 内容列宽度，按钮自然落在与其它按钮同一条竖线上。 */
         .token-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            padding: 0.7rem 0.85rem;
-            /* 负 margin 抵消自身左右 padding：
-               让「内容区」而非「边框」与卡片内容区对齐。
-               否则吊销按钮会比同页其它按钮（如「修改」「新建密钥」）
-               往里缩 0.85rem + 1px 边框 ≈ 15px，几条按钮的右边缘就不在一条线上。 */
-            margin-left: calc(-0.85rem - 1px);
-            margin-right: calc(-0.85rem - 1px);
-            margin-bottom: 0.5rem;
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(2, 255, 142, 0.12);
-            border-radius: 10px;
-            transition: border-color 0.2s ease, background 0.2s ease;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(2, 255, 142, 0.1);
+            transition: border-color 0.2s ease;
         }
-        .token-item:hover {
-            border-color: rgba(2, 255, 142, 0.28);
-            background: rgba(2, 255, 142, 0.04);
-        }
+        .token-item:first-child { border-top: 1px solid rgba(2, 255, 142, 0.1); }
+        .token-item:last-child { border-bottom: none; }
+        .token-item:hover { border-bottom-color: rgba(2, 255, 142, 0.3); }
         .token-item-main { min-width: 0; flex: 1; }
         .token-item-name {
             color: rgba(255, 255, 255, 0.9);
@@ -1730,7 +1757,7 @@
         }
         .token-item-name i { color: #02ff8e; font-size: 0.8rem; flex: none; }
         .token-item-meta {
-            margin-top: 0.25rem;
+            margin-top: 0.3rem;
             font-size: 0.72rem;
             color: rgba(255, 255, 255, 0.35);
             display: flex;
@@ -1764,16 +1791,12 @@
         .modal-footer { justify-content: flex-end; }
 
         @media (max-width: 600px) {
-            /* 窄屏改纵向排布：卡片 padding 收到 1rem，
-               条目内边距同步调小，负 margin 仍然精确抵消，
-               保证按钮右边缘与其它卡片里的按钮保持同一条线 */
+            /* 窄屏改纵向排布：按钮独占一行并撑满，右边缘依然与其它按钮一致 */
             .token-item {
                 flex-direction: column;
                 align-items: stretch;
-                gap: 0.5rem;
-                padding: 0.6rem;
-                margin-left: calc(-0.6rem - 1px);
-                margin-right: calc(-0.6rem - 1px);
+                gap: 0.55rem;
+                padding: 0.8rem 0;
             }
             .token-item .btn { width: 100%; justify-content: center; }
         }

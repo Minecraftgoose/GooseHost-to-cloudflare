@@ -45,6 +45,7 @@ import { enforceApiKeyScope } from './utils/apikey-scope.js';
 import { handleDebugSyncEmails, handleDebugTestAuth } from './debug.js';
 
 import { handleAiChat } from './ai/chat.js';
+import { handleAiImage } from './ai/image.js';
 
 import {
   handlePlayListPosts,
@@ -201,6 +202,11 @@ export default {
     // POST /api/ai/chat - AI Copilot 转发（认证与限流在 handler 内）
     if (url.pathname === '/api/ai/chat' && method === 'POST') {
       return await handleAiChat(request, env, corsHeaders);
+    }
+
+    // POST /api/ai/image - AI 生图转发（认证与限流在 handler 内）
+    if (url.pathname === '/api/ai/image' && method === 'POST') {
+      return await handleAiImage(request, env, corsHeaders);
     }
 
     // POST /api/create - 创建站点

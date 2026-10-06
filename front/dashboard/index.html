@@ -611,11 +611,11 @@
                 </div>
                 <button class="modal-close" onclick="closeProjFileModal()">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body modal-body--fill">
                 <input type="hidden" id="projFileSlug">
                 <input type="hidden" id="projFilePath">
-                <textarea id="projFileContent" placeholder="文件内容..." style="min-height: 380px; font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.6; padding: 12px; width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(2,255,142,0.2); border-radius: 6px; color: #fff; resize: vertical;"></textarea>
-                <div id="projFileHint" style="margin-top: 0.5rem; font-size: 0.78rem; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 0.3rem;">
+                <textarea id="projFileContent" placeholder="文件内容..." style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.6; padding: 12px; width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(2,255,142,0.2); border-radius: 6px; color: #fff; resize: vertical;"></textarea>
+                <div id="projFileHint" style="flex:none; margin-top: 0.5rem; font-size: 0.78rem; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 0.3rem;">
                     <i class="fas fa-info-circle"></i> 保存将覆盖原文件，单文件上限 200KB
                 </div>
             </div>
@@ -635,7 +635,7 @@
                 </div>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body modal-body--fill">
                 <input type="hidden" id="editSlug">
                 <input type="hidden" id="editType">
 

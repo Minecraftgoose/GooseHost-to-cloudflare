@@ -135,6 +135,7 @@
     width: 100%;
     max-width: 720px;
     flex-shrink: 0;
+    position: relative;
     align-self: center;
     background: var(--gai-acrylic-panel);
     -webkit-backdrop-filter: blur(8px);
@@ -153,8 +154,16 @@
 }
 .cop-textarea {
     width: 100%;
-    min-height: 28px;
+    /* 关键：min-height 必须容纳「一行文字 + 内边距」。
+       font-size:15px × line-height:1.55 ≈ 23px，而 box-sizing:border-box
+       下 min-height 含 padding —— 原来写 28px 意味着内容区只剩 4px，
+       空状态的一行文字被裁掉大半，看起来就像「被压了一节」。
+       这里给 24px(一行) + 上下 padding 的余量，并统一 JS 的下限值。 */
+    min-height: 24px;
+    height: 24px;
     max-height: 180px;
+    padding: 0;
+    margin: 0;
     resize: none;
     border: none;
     outline: none;
@@ -163,7 +172,7 @@
     font-size: 15px;
     line-height: 1.55;
     font-family: inherit;
-    overflow-y: auto;
+    overflow-y: hidden;
 }
 .cop-textarea::placeholder { color: var(--gai-text-secondary); }
 .cop-input-tools {
@@ -203,6 +212,150 @@
     background: var(--gai-brand-soft);
     border-color: rgba(2, 255, 142, 0.35);
 }
+/* ===== 模型选择器 ===== */
+.cop-model-chip {
+    max-width: 240px;
+}
+.cop-model-caret {
+    font-size: 10px;
+    opacity: .55;
+    margin-left: 1px;
+    transition: transform .18s ease;
+}
+.cop-model-chip[aria-expanded="true"] .cop-model-caret { transform: rotate(180deg); }
+.cop-model-chip.is-image {
+    color: var(--gai-brand);
+    background: var(--gai-brand-soft);
+    border-color: rgba(2, 255, 142, 0.45);
+}
+
+.cop-model-panel {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: calc(100% + 8px);
+    background: rgba(10, 20, 14, 0.98);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(2, 255, 142, 0.22);
+    border-radius: var(--gai-radius-sm);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    padding: 12px 12px 10px;
+    z-index: 40;
+}
+.cop-model-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.32);
+    margin-bottom: 8px;
+}
+.cop-model-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 9px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: rgba(255, 255, 255, 0.72);
+    cursor: pointer;
+    text-align: left;
+    transition: background .15s, border-color .15s;
+}
+.cop-model-item:hover { background: rgba(2, 255, 142, 0.07); }
+.cop-model-item.active {
+    background: var(--gai-brand-soft);
+    border-color: rgba(2, 255, 142, 0.35);
+    color: var(--gai-text);
+}
+.cop-model-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+}
+.cop-model-item.active .cop-model-dot {
+    background: var(--gai-brand);
+    box-shadow: 0 0 8px rgba(2, 255, 142, 0.65);
+}
+.cop-model-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.cop-model-meta b { font-size: 13px; font-weight: 600; }
+.cop-model-meta i {
+    font-style: normal;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.34);
+    margin-top: 2px;
+}
+.cop-model-check { color: var(--gai-brand); font-size: 12px; flex-shrink: 0; }
+
+.cop-model-div {
+    height: 1px;
+    background: rgba(2, 255, 142, 0.14);
+    margin: 10px 0;
+}
+.cop-model-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.cop-model-rowt { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.cop-seg {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--gai-border);
+    border-radius: 9px;
+    padding: 2px;
+    gap: 2px;
+}
+.cop-seg-btn {
+    padding: 4px 14px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.cop-seg-btn.on {
+    background: var(--gai-brand-soft);
+    color: var(--gai-brand);
+}
+.cop-model-sw {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 2px;
+    cursor: pointer;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.72);
+}
+.cop-model-sw input {
+    width: 15px; height: 15px;
+    accent-color: #02ff8e;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.cop-model-sw span { flex-shrink: 0; }
+.cop-model-sw i {
+    font-style: normal;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cop-model-foot {
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px dashed rgba(2, 255, 142, 0.14);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.26);
+}
+
 .cop-tool-right {
     display: flex;
     align-items: center;
@@ -634,18 +787,34 @@
     .cop-ai-content.cop-streaming::after { animation: none; }
     .cop-dot-loading span { opacity: .6; }
 }
+/* ===== Copilot 全屏：突破 1200px 居中列，铺满视口 =====
+   .content 的 max-width:1200px 已在下面清掉，但真正的外框是
+   .main-layout 的左右 padding（= (100% - 1200px)/2）。
+   所以还要把 main-layout 的 padding 归零，才能真正贴到屏幕两边。 */
+body.cop-fullscreen .main-layout {
+    padding-left: 0;
+    padding-right: 0;
+}
+
 .content.copilot-fullscreen {
     padding: 0;
     max-width: none;
+    margin-left: 0;
+    width: 100%;
     overflow: hidden;             
     align-self: stretch;
     min-height: 0;
     display: flex;
     flex-direction: column;
 }
+
+/* Copilot 页不显示公告：聊天区是沉浸式全屏布局，
+   顶部横条会把 #page-copilot 挤下去，也破坏了铺满的观感。 */
+body.cop-fullscreen #announcementBanner {
+    display: none !important;
+}
 .content.copilot-fullscreen #announcementBanner {
-    flex-shrink: 0;
-    margin: 10px 12px 0;
+    display: none !important;
 }
 .content.copilot-fullscreen #page-copilot {
     flex: 1;

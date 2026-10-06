@@ -53,6 +53,20 @@ const PROVIDERS = {
   // 全量模型与元数据可拉取：https://opencode.ai/zen/v1/models
   // ⚠️ deepseek-v4-flash 不带 -free 后缀，是【付费模型】；免费端点是
   // deepseek-v4-flash-free（已在列表中）。两者不要混用。
+  // Agnes：Copilot 的第二个引擎（源自 ZIran）。
+  // 与默认引擎（GLM）并存，由前端在请求体里通过 provider:"agnes" 选择；
+  // 上游地址与 Key 全部由服务端环境变量决定，前端无法指定 endpoint / key。
+  //   AGNES_API_KEYS（或 AGNES_API_KEY）— 必填，逗号分隔可轮换
+  agnes: {
+    label: 'Agnes',
+    baseURL: 'https://api.agnes-ai.cn/v1',
+    models: ['agnes-2.5-flash', 'agnes-2.5-pro'],
+    // 深度思考：由前端 think:true 显式开启时才注入，默认不注入
+    extraBody: {},
+    // 服务端侧能力：联网搜索由本 Worker 调 Tavily 注入上下文，
+    // 不依赖模型是否支持 tool calling —— 兼容性更好。
+    serverSearch: true
+  },
   'opencode-zen': {
     label: 'OpenCode Zen',
     baseURL: 'https://opencode.ai/zen/v1',
@@ -99,6 +113,79 @@ function resolveProvider(env) {
   const name = String(env.AI_PROVIDER || '').trim().toLowerCase();
   return name ? PROVIDERS[name] || null : null;
 }
+/**
+ * 决定本次请求用哪个 provider。
+ * 前端只能传名字（如 "agnes"），且必须命中 PROVIDERS 白名单；
+ * 传了未知名字就回落到环境变量配置的默认 provider。
+ * 这样即便前端被篡改，也无法把请求打到任意上游地址。
+ */
+function pickProvider(payload, env) {
+  const want = String((payload && payload.provider) || '').trim().toLowerCase();
+  if (want && Object.prototype.hasOwnProperty.call(PROVIDERS, want)) return PROVIDERS[want];
+  return resolveProvider(env);
+}
+/** 与 provider 对应的 Key 链：agnes 用独立环境变量，其余用通用 AI_API_KEYS */
+function keyChainFor(provider, env) {
+  if (provider === PROVIDERS.agnes) {
+    return String(env.AGNES_API_KEYS || env.AGNES_API_KEY || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return keyChain(env);
+}
+/** provider 对应的默认模型链 */
+function modelChainFor(provider, env) {
+  if (provider) {
+    const raw = (env.AI_MODEL || '').trim();
+    // 只有默认 provider 才吃 AI_MODEL 覆盖；显式选 agnes 时不串味
+    if (!(raw && provider === resolveProvider(env))) return provider.models.slice();
+  }
+  return modelChain(env);
+}
+/**
+ * 联网搜索（Tavily）。由服务端注入检索结果，再交给模型总结。
+ * 比让模型自己 tool_call 更稳：不依赖模型是否支持 function calling，
+ * 也不会出现「模型编造搜索结果」的情况。
+ */
+async function tavilySearch(query, env) {
+  const key = String(env.TAVILY_API_KEY || '').trim();
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        query: String(query).slice(0, 500),
+        max_results: 5,
+        search_depth: 'basic'
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const list = Array.isArray(d && d.results) ? d.results : [];
+    if (!list.length) return null;
+    return list.slice(0, 5).map(x => ({
+      title: x.title || '',
+      url: x.url || '',
+      content: String(x.content || '').slice(0, 800)
+    }));
+  } catch { return null; }
+}
+function injectSearchContext(messages, hits) {
+  const brief = hits.map((h, i) =>
+    `[${i + 1}] ${h.title}\n${h.url}\n${h.content}`).join('\n\n');
+  const sys = {
+    role: 'system',
+    content: '以下是联网检索到的实时资料（含标题、链接与摘要）。请基于它们回答，'
+      + '并在句末用 [编号](链接) 标注来源。资料不足以回答时如实说明，不要编造。\n\n' + brief
+  };
+  const arr = messages.slice();
+  const firstNonSystem = arr.findIndex(m => m && m.role !== 'system');
+  if (firstNonSystem < 0) arr.push(sys);
+  else arr.splice(firstNonSystem, 0, sys);
+  return arr;
+}
 function modelChain(env) {
   const provider = resolveProvider(env);
   const fallback = provider ? provider.models : DEFAULT_MODELS;
@@ -129,6 +216,10 @@ function buildBody(model, payload, env, stream, providerOverride) {
   // OpenCode Zen 为 {}，不额外注入参数，保持 Chat Completions 兼容）。
   if (provider && provider.extraBody && typeof provider.extraBody === 'object') {
     for (const k of Object.keys(provider.extraBody)) body[k] = provider.extraBody[k];
+  }
+  // 深度思考参数（前端 think:true 时注入）
+  if (payload && payload._thinkExtra) {
+    for (const k of Object.keys(payload._thinkExtra)) body[k] = payload._thinkExtra[k];
   }
   if (Array.isArray(payload.tools) && payload.tools.length) {
     body.tools = payload.tools;
@@ -215,7 +306,6 @@ export async function handleAiChat(request, env, corsHeaders) {
       : `请求过于频繁，请在 ${Math.ceil(rl.resetIn)} 秒后重试`;
     return jsonResp({ error: msg, retryAfter: Math.ceil(rl.resetIn) }, 429, corsHeaders);
   }
-  const serverKeyList = keyChain(env);
   const errors = [];                       // 函数级作用域：tryModelOnce 闭包与汇总返回都会 push
   let payload;
   try { payload = await request.json(); } catch {
@@ -224,17 +314,43 @@ export async function handleAiChat(request, env, corsHeaders) {
   if (!Array.isArray(payload?.messages) || !payload.messages.length) {
     return jsonResp({ error: 'messages 不能为空' }, 400, corsHeaders);
   }
-  const provider = resolveProvider(env);
   // 上游地址与 API Key 一律由服务端环境变量决定（AI_BASE_URL / AI_PROVIDER / AI_API_KEYS / AI_MODEL），
-  // 请求体中的 endpoint / apiKey / model 不再生效——前端已移除自定义模型功能。
-  // 仍统一走代理（而非浏览器直连）是为了隐藏服务端 Key、复用 Key 轮换与限流。
-  const activeProvider = provider;
-  const base = (env.AI_BASE_URL || (provider && provider.baseURL) || DEFAULT_BASE).replace(/\/$/, '');
-  const keyList = serverKeyList;
+  // 请求体中的 endpoint / apiKey 不再生效。
+  // provider 是唯一允许前端选择的东西，且必须是 PROVIDERS 白名单里的名字（如 "agnes"）。
+  const activeProvider = pickProvider(payload, env);
+  const isAgnes = activeProvider === PROVIDERS.agnes;
+  const base = isAgnes
+    ? activeProvider.baseURL
+    : (env.AI_BASE_URL || (activeProvider && activeProvider.baseURL) || DEFAULT_BASE).replace(/\/$/, '');
+  const keyList = keyChainFor(activeProvider, env);
   if (!keyList.length) {
-    return jsonResp({ error: '服务端未配置 AI_API_KEYS 或 AI_API_KEY' }, 500, corsHeaders);
+    return jsonResp({
+      error: isAgnes
+        ? '服务端未配置 AGNES_API_KEYS / AGNES_API_KEY'
+        : '服务端未配置 AI_API_KEYS 或 AI_API_KEY'
+    }, 500, corsHeaders);
   }
-  const models = modelChain(env);
+
+  // ---- 联网搜索：服务端检索后注入上下文 ----
+  let searchUsed = false;
+  if (payload.search === true && activeProvider && activeProvider.serverSearch) {
+    const lastUser = [...payload.messages].reverse().find(m => m && m.role === 'user');
+    const q = lastUser ? String(lastUser.content || '').slice(0, 500) : '';
+    if (q) {
+      const hits = await tavilySearch(q, env);
+      if (hits && hits.length) {
+        payload.messages = injectSearchContext(payload.messages, hits);
+        searchUsed = true;
+      }
+    }
+  }
+  // ---- 深度思考：仅显式开启时注入 ----
+  if (payload.think === true) {
+    const effort = String(payload.thinkEffort || 'high');
+    payload._thinkExtra = { thinking: { type: 'enabled' }, reasoning_effort: effort };
+  }
+
+  const models = modelChainFor(activeProvider, env);
   // OpenCode Zen：本代理只会发 Chat Completions 格式的请求体，
   // 但 Zen 的 GPT / Grok / Claude / Qwen / Gemini / Jev 走的是别的 endpoint 和别的协议。
   // 与其静默打到 /chat/completions 拿一个难懂的错误，不如直接告诉用户该用哪个端点。

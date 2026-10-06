@@ -9,8 +9,193 @@
         var base = (window.API_URL || API_FALLBACK).replace(/\/$/, '');
         return base + '/api/ai/chat';
     }
+    /* ===== 引擎 / 模型选择器 =====
+       两套引擎：
+         · goose —— 原有 GooseHost Copilot，带建站工具链，服务端默认 provider
+         · agnes —— 外部融合模型，支持联网检索、深度思考、生图
+       前端只发「引擎标识 + 模型名」，Key 全在后端环境变量里，永不外泄。 */
+    var ENGINES = [
+        { id: 'goose',  label: 'GooseHost Copilot', desc: '建站工具链 · 生成并部署站点',
+          provider: null,    model: null,              tools: true,  caps: {} },
+        { id: 'agnes-flash', label: 'Agnes Flash', desc: '联网 · 生图 · 深度思考',
+          provider: 'agnes', model: 'agnes-2.5-flash', tools: false, caps: { search: 1, think: 1, image: 1 } },
+        { id: 'agnes-pro',   label: 'Agnes Pro',   desc: '更强推理 · 同样支持联网与生图',
+          provider: 'agnes', model: 'agnes-2.5-pro',   tools: false, caps: { search: 1, think: 1, image: 1 } }
+    ];
+    var ENGINE_KEY = 'cop_engine_v1';
+    var OPT_KEY = 'cop_engine_opts_v1';
+    var currentEngine = ENGINES[0];
+    var engineOpts = { search: false, think: false, mode: 'chat' };
+
+    function loadEnginePref() {
+        try {
+            var id = localStorage.getItem(ENGINE_KEY);
+            var found = ENGINES.filter(function (e) { return e.id === id; })[0];
+            if (found) currentEngine = found;
+            var o = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
+            if (o && typeof o === 'object') {
+                engineOpts.search = !!o.search;
+                engineOpts.think = !!o.think;
+                engineOpts.mode = (o.mode === 'image') ? 'image' : 'chat';
+            }
+        } catch (e) { }
+    }
+    function saveEnginePref() {
+        try {
+            localStorage.setItem(ENGINE_KEY, currentEngine.id);
+            localStorage.setItem(OPT_KEY, JSON.stringify(engineOpts));
+        } catch (e) { }
+    }
+    function isAgnes() { return currentEngine.provider === 'agnes'; }
+    function hasCap(name) { return !!(currentEngine.caps && currentEngine.caps[name]); }
+
+    /* ===== 模型选择器 UI =====
+       位置：输入框上方（原「赞美Minecraft_goose」chip 所在的那一行）。
+       收起时是一个 chip，展开为面板：引擎列表 + 能力开关。 */
+    function mountModelPicker() {
+        var wrap = document.getElementById('copInputWrap') || document.querySelector('.cop-input-wrap');
+        var bar = document.getElementById('copQuick');
+        if (!wrap || !bar) return;
+
+        // 收起态 chip
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cop-tool-chip cop-model-chip';
+        chip.id = 'copModelChip';
+        bar.insertBefore(chip, bar.firstChild);
+
+        // 展开面板
+        var panel = document.createElement('div');
+        panel.className = 'cop-model-panel';
+        panel.id = 'copModelPanel';
+        panel.style.display = 'none';
+        bar.parentNode.insertBefore(panel, bar.nextSibling);
+
+        function renderChip() {
+            var modeTag = (hasCap('image') && engineOpts.mode === 'image') ? ' · 生图' : '';
+            chip.innerHTML = '<i class="fas fa-cube"></i> '
+                + esc(currentEngine.label) + modeTag + ' <span class="cop-model-caret">▾</span>';
+            chip.classList.toggle('is-image', hasCap('image') && engineOpts.mode === 'image');
+            chip.setAttribute('aria-expanded', panel.style.display === 'none' ? 'false' : 'true');
+        }
+        function renderPanel() {
+            var list = ENGINES.map(function (e) {
+                var on = e.id === currentEngine.id;
+                return '<button type="button" class="cop-model-item' + (on ? ' active' : '') + '" data-engine="' + esc(e.id) + '">'
+                    + '<span class="cop-model-dot"></span>'
+                    + '<span class="cop-model-meta"><b>' + esc(e.label) + '</b><i>' + esc(e.desc) + '</i></span>'
+                    + (on ? '<span class="cop-model-check"><i class="fas fa-check"></i></span>' : '')
+                    + '</button>';
+            }).join('');
+
+            var caps = '';
+            if (hasCap('search') || hasCap('think') || hasCap('image')) {
+                var seg = hasCap('image')
+                    ? '<div class="cop-model-row"><span class="cop-model-rowt">模式</span>'
+                        + '<div class="cop-seg">'
+                        + '<button type="button" class="cop-seg-btn' + (engineOpts.mode === 'chat' ? ' on' : '') + '" data-mode="chat">对话</button>'
+                        + '<button type="button" class="cop-seg-btn' + (engineOpts.mode === 'image' ? ' on' : '') + '" data-mode="image">生图</button>'
+                        + '</div></div>'
+                    : '';
+                var srow = hasCap('search')
+                    ? '<label class="cop-model-sw"><input type="checkbox" id="copOptSearch"' + (engineOpts.search ? ' checked' : '') + '><span>联网搜索</span>'
+                        + '<i>检索实时资料并标注来源</i></label>'
+                    : '';
+                var trow = (hasCap('think') && engineOpts.mode !== 'image')
+                    ? '<label class="cop-model-sw"><input type="checkbox" id="copOptThink"' + (engineOpts.think ? ' checked' : '') + '><span>深度思考</span>'
+                        + '<i>先推理再作答，响应更慢但更稳</i></label>'
+                    : '';
+                caps = '<div class="cop-model-div"></div>' + seg + srow + trow;
+            }
+            panel.innerHTML = '<div class="cop-model-title">选择引擎</div>' + list + caps
+                + '<div class="cop-model-foot">模型密钥保存在服务端，前端不接触</div>';
+
+            Array.prototype.forEach.call(panel.querySelectorAll('.cop-model-item'), function (b) {
+                b.onclick = function (ev) {
+                    // 必须阻止冒泡：下面 renderPanel() 会重建 innerHTML，
+                    // 令 e.target 脱离文档，document 上的「点击别处收起」判断
+                    // panel.contains(e.target) 就会变成 false，导致刚选完就被关掉。
+                    if (ev && ev.stopPropagation) ev.stopPropagation();
+                    var id = b.getAttribute('data-engine');
+                    var e = ENGINES.filter(function (x) { return x.id === id; })[0];
+                    if (!e) return;
+                    currentEngine = e;
+                    // 切到不支持生图/搜索的引擎时收敛开关，避免留下无效状态
+                    if (!hasCap('image')) engineOpts.mode = 'chat';
+                    if (!hasCap('search')) engineOpts.search = false;
+                    if (!hasCap('think')) engineOpts.think = false;
+                    saveEnginePref();
+                    renderChip(); renderPanel();
+                };
+            });
+            Array.prototype.forEach.call(panel.querySelectorAll('.cop-seg-btn'), function (b) {
+                b.onclick = function (ev) {
+                    if (ev && ev.stopPropagation) ev.stopPropagation();
+                    engineOpts.mode = b.getAttribute('data-mode') === 'image' ? 'image' : 'chat';
+                    saveEnginePref();
+                    renderChip(); renderPanel();
+                    syncPlaceholder();
+                };
+            });
+            var cs = document.getElementById('copOptSearch');
+            if (cs) {
+                cs.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); };
+                cs.onchange = function () { engineOpts.search = cs.checked; saveEnginePref(); };
+            }
+            var ct = document.getElementById('copOptThink');
+            if (ct) {
+                ct.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); };
+                ct.onchange = function () { engineOpts.think = ct.checked; saveEnginePref(); };
+            }
+        }
+        chip.onclick = function (e) {
+            e.stopPropagation();
+            var showing = panel.style.display !== 'none';
+            panel.style.display = showing ? 'none' : 'block';
+            if (!showing) renderPanel();
+            renderChip();
+        };
+
+        loadEnginePref();
+        renderChip();
+        panel.style.display = 'none';
+
+        // 点击别处 / 按 Esc 收起
+        document.addEventListener('click', function (e) {
+            if (panel.style.display === 'none') return;
+            if (panel.contains(e.target) || chip.contains(e.target)) return;
+            panel.style.display = 'none';
+            renderChip();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && panel.style.display !== 'none') {
+                panel.style.display = 'none';
+                renderChip();
+            }
+        });
+    }
+
+    function syncPlaceholder() {
+        var input = document.getElementById('copInput');
+        if (!input) return;
+        input.placeholder = (hasCap('image') && engineOpts.mode === 'image')
+            ? '描述你想生成的画面，Enter 发送'
+            : '描述你想要的页面，Enter 发送';
+    }
+
     function buildChatBody(messages, stream) {
-        var body = { messages: messages, tools: TOOLS, temperature: 0.3 };
+        var body = { messages: messages, temperature: 0.3 };
+        // 建站工具链只有 GooseHost Copilot 用；Agnes 是通用对话，不带工具
+        if (currentEngine.tools) body.tools = TOOLS;
+        if (currentEngine.provider) body.provider = currentEngine.provider;
+        if (currentEngine.model) body.model = currentEngine.model;
+        if (isAgnes()) {
+            if (hasCap('search') && engineOpts.search) body.search = true;
+            if (hasCap('think') && engineOpts.think) {
+                body.think = true;
+                body.thinkEffort = engineOpts.effort || 'high';
+            }
+        }
         if (stream) body.stream = true;
         return JSON.stringify(body);
     }
@@ -1635,9 +1820,51 @@
         if (built.length) msg.tool_calls = built;
         return msg;
     }
+    /* ===== 生图（Agnes 专用模式）=====
+       走后端代理 /api/ai/image，Key 不落前端。 */
+    async function sendImage(prompt) {
+        var res = await copFetch((window.API_URL || 'https://page.goose.cc.cd') + '/api/ai/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt, size: '1024x1024' })
+        }, 120000);
+        var data = null;
+        try { data = await res.json(); } catch (e) { }
+        if (!res.ok) throw new Error((data && data.error) || ('生图失败（HTTP ' + res.status + '）'));
+        if (!data || !data.url) throw new Error('生图返回缺少图片地址');
+        return data;
+    }
+
     async function send(text) {
         if (busy) return;
         if (!text || !text.trim()) return;
+
+        // 生图模式：不进对话循环，直接调生图并在流里渲染图片
+        if (hasCap('image') && engineOpts.mode === 'image') {
+            busy = true; aborted = false;
+            setBusy(true);
+            pushMsg('user', text);
+            try {
+                var streamEl = beginStreamMsg();
+                updateStreamMsg(streamEl, '正在生成图片…');
+                var out = await sendImage(text);
+                var md = '![生成结果](' + out.url + ')\n\n'
+                    + '> 模型：' + (out.model || currentEngine.label)
+                    + ' ｜ 尺寸：' + (out.size || '1024x1024');
+                endStreamMsg(streamEl, md);
+                history.push({ role: 'user', content: text });
+                history.push({ role: 'assistant', content: md });
+            } catch (e) {
+                var box = document.getElementById('copMsgs');
+                if (box && box.lastElementChild) removeStreamMsg(box.lastElementChild);
+                pushMsg('system', '生图失败：' + (e && e.message ? e.message : String(e)));
+            } finally {
+                busy = false; aborted = false;
+                setBusy(false);
+            }
+            return;
+        }
+
         busy = true; aborted = false;
         setBusy(true);
         pushMsg('user', text);
@@ -1813,10 +2040,14 @@
         var input = document.getElementById('copInput');
         var sendBtn = document.getElementById('copSend');
         var stopBtn = document.getElementById('copStop');
-        var MAX_INPUT_H = 120;   
+        var MAX_INPUT_H = 180;
+        // 一行文字的高度（font-size:15px × line-height:1.55 ≈ 23.25px），
+        // 向上取整到 24。必须与 CSS 的 .cop-textarea min-height 保持一致，
+        // 否则空状态会被 min-height 截断成「少了一截」。
+        var ONE_LINE_H = 24;
         function autoGrow() {
             input.style.height = 'auto';
-            var h = Math.max(24, Math.min(input.scrollHeight, MAX_INPUT_H));
+            var h = Math.max(ONE_LINE_H, Math.min(input.scrollHeight, MAX_INPUT_H));
             input.style.height = h + 'px';
             input.style.overflowY = input.scrollHeight > MAX_INPUT_H ? 'auto' : 'hidden';
         }
@@ -1826,7 +2057,6 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
         });
         var QUICK = [
-            '赞美一下Minecraft_goose',
             '介绍你自己和功能'
         ];
         var quickBox = document.getElementById('copQuick');
@@ -1854,6 +2084,9 @@
                 });
             };
         });
+        mountModelPicker();
+        syncPlaceholder();
+
         sendBtn.onclick = function () {
             var v = input.value;
             if (!v.trim()) return;
@@ -1960,7 +2193,9 @@
     function setBusy(b) {
         var sendBtn = document.getElementById('copSend');
         var stopBtn = document.getElementById('copStop');
-        setModelLabel(b ? '执行中…' : (currentModel || '闲着呢'));
+        // 兜底：后端若还没配 Access-Control-Expose-Headers，前端读不到 X-Copilot-Model，
+        // 此时退回「当前引擎名」，至少不会一直显示「闲着呢」让人以为没在跑。
+        setModelLabel(b ? '执行中…' : (currentModel || currentEngine.label || '闲着呢'));
         if (sendBtn) sendBtn.style.display = b ? 'none' : 'flex';
         if (stopBtn) stopBtn.style.display = b ? 'flex' : 'none';
         syncSendBtn();
@@ -2398,7 +2633,11 @@
     function syncFullscreen() {
         var content = document.querySelector('.content');
         if (!content || !pageRoot) return;
-        content.classList.toggle('copilot-fullscreen', pageRoot.classList.contains('active'));
+        var on = pageRoot.classList.contains('active');
+        content.classList.toggle('copilot-fullscreen', on);
+        // 同步到 body：让 .main-layout 去掉左右 padding（突破 1200px 居中列）
+        // 同时隐藏公告条。仅靠 .content 上的类无法影响父级容器的 padding。
+        document.body.classList.toggle('cop-fullscreen', on);
     }
     function watchFullscreen() {
         if (!pageRoot || typeof MutationObserver === 'undefined') { syncFullscreen(); return; }

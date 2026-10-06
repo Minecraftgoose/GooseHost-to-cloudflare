@@ -46,6 +46,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           AI_API_KEYS: ${{ secrets.AI_API_KEYS }}
+          AGNES_API_KEYS: ${{ secrets.AGNES_API_KEYS }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
           printf '%s' "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL
           printf '%s' "${{ secrets.SUPABASE_ANON_KEY }}" | npx wrangler secret put SUPABASE_ANON_KEY
@@ -57,6 +59,23 @@ jobs:
             printf '%s' "$AI_API_KEYS" | npx wrangler secret put AI_API_KEYS
           else
             echo "AI_API_KEYS not set in repo secrets, skipping (keeping existing value on Cloudflare)"
+          fi
+
+          # Agnes 引擎（Copilot 第二个模型，对话与生图共用同一把 Key）
+          # 未配置时 Agnes 选项会提示「服务端未配置」，不影响默认引擎
+          if [ -n "$AGNES_API_KEYS" ]; then
+            echo "Pushing AGNES_API_KEYS..."
+            printf '%s' "$AGNES_API_KEYS" | npx wrangler secret put AGNES_API_KEYS
+          else
+            echo "AGNES_API_KEYS not set in repo secrets, skipping (keeping existing value on Cloudflare)"
+          fi
+
+          # Tavily：Agnes 的联网搜索。未配置时静默降级为不检索，不会报错
+          if [ -n "$TAVILY_API_KEY" ]; then
+            echo "Pushing TAVILY_API_KEY..."
+            printf '%s' "$TAVILY_API_KEY" | npx wrangler secret put TAVILY_API_KEY
+          else
+            echo "TAVILY_API_KEY not set in repo secrets, skipping (keeping existing value on Cloudflare)"
           fi
 
       - name: Deploy to Cloudflare Workers
