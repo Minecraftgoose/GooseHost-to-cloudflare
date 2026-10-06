@@ -737,8 +737,12 @@
         .modal-content {
             width: 100%;
             max-width: 800px;
-            max-height: 90vh;
-            overflow: auto;
+            /* 关键：容器本身不滚动（否则整个弹窗外框会挂一条滚动条），
+               改由 .modal-body 在内容真的超长时内部滚动 —— 标题和底部按钮始终可见。 */
+            max-height: calc(100vh - 2rem);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             transform: scale(0.9) translateY(20px);
             transition: transform 0.3s ease;
         }
@@ -753,6 +757,7 @@
             align-items: center;
             padding: 1.25rem 1.5rem;
             border-bottom: 1px solid rgba(2, 255, 142, 0.15);
+            flex: none;
         }
 
         .modal-title {
@@ -775,14 +780,30 @@
 
         .modal-close:hover { color: #fff; }
 
-        .modal-body { padding: 1.5rem; }
+        .modal-body {
+            padding: 1.5rem;
+            flex: 1 1 auto;
+            min-height: 0;            /* 允许在 flex 容器里正确收缩并滚动 */
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
 
         .modal-footer {
             display: flex;
             gap: 0.75rem;
             padding: 1rem 1.5rem;
             border-top: 1px solid rgba(2, 255, 142, 0.15);
+            flex: none;
         }
+
+        /* 弹窗内滚动条细化，避免粗滚动条影响观感 */
+        .modal-body::-webkit-scrollbar { width: 6px; }
+        .modal-body::-webkit-scrollbar-track { background: transparent; }
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(2, 255, 142, 0.25);
+            border-radius: 3px;
+        }
+        .modal-body::-webkit-scrollbar-thumb:hover { background: rgba(2, 255, 142, 0.4); }
 
         /* ===== 自定义对话框 ===== */
         .custom-dialog {
