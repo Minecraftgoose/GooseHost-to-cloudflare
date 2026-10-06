@@ -7,6 +7,10 @@ compatibility_date = "2026-07-27"
 # 若上游报 400 unknown parameter，把这里改成 "off" 即可全局降级，无需改代码。
 AI_THINKING = "on"
 
+# 额外的 CORS 来源（逗号分隔）。只在你用别的域名访问前端时才需要登记，
+# 例如 Cloudflare Pages 的预览域名：CORS_EXTRA_ORIGINS = "https://xxx.pages.dev"
+CORS_EXTRA_ORIGINS = ""
+
 API_URL = "https://page.goose.cc.cd"
 ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955"
 

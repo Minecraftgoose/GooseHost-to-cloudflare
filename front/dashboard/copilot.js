@@ -1606,6 +1606,59 @@
         }
         return res;
     }
+    /* ===== 网络层错误的诊断 =====
+       fetch 抛 "NetworkError when attempting to fetch resource" / TypeError: Failed to fetch
+       时，浏览器【不提供任何状态码】，用户看到的就是一句无从下手的话。
+       真实原因通常是这几种，这里逐个自动探测，把结论直接摆出来。 */
+    async function diagnoseNetworkError(url) {
+        var out = [];
+        try {
+            // ① Service Worker 拦截（本站历史上踩过：注册了不存在的 sw.js）
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                out.push('· 检测到 Service Worker 正在接管页面，它会拦截 API 请求。'
+                    + '建议在 F12 → Application → Service Workers 里 Unregister，然后强制刷新。');
+            }
+            // ② 纯连通性：no-cors 模式下能发出去说明网络通，问题在 CORS
+            var reachable = false, corsBlocked = false;
+            try {
+                var ping = await fetch(url, { method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' }, body: '{}' });
+                reachable = true;    // no-cors 下 opaque 响应也代表请求发出去了
+            } catch (e) { reachable = false; }
+            if (reachable) {
+                corsBlocked = true;
+                out.push('· 网络可达，但正常请求被拦 —— 基本是 CORS 或 Service Worker 问题。'
+                    + '请确认访问域名与 API 白名单匹配（当前来源：' + location.origin + '）。');
+            } else {
+                out.push('· 请求根本没发出去：可能是断网、DNS 解析失败，或 API 域名不可达。');
+            }
+            // ③ 顺带看 API 是否活着（GET 一个轻量接口）
+            try {
+                var cfg = await fetch(String(url).replace(/\/api\/ai\/chat$/, '/api/config'),
+                    { method: 'GET' });
+                out.push('· API 连通性探测：HTTP ' + cfg.status + (cfg.ok ? '（服务正常）' : '（服务异常）'));
+            } catch (e) {
+                out.push('· API 连通性探测：失败（' + (e && e.message ? e.message : e) + '）');
+            }
+        } catch (e) { }
+        return out;
+    }
+
+    function isNetworkError(e) {
+        var m = String((e && e.message) || e || '').toLowerCase();
+        return (e instanceof TypeError && /fetch|network/i.test(m))
+            || /networkerror|failed to fetch|load failed|network request failed/i.test(m);
+    }
+
+    async function explainError(e, url) {
+        var m = String((e && e.message) || e || '');
+        if (!isNetworkError(e)) return m;
+        var tips = await diagnoseNetworkError(url || chatEndpoint());
+        return '网络请求失败（浏览器未返回状态码，常见于 CORS / Service Worker / 断网）。\n'
+            + (tips.length ? tips.join('\n') : '')
+            + '\n· 原始信息：' + m;
+    }
+
     function withTimeout(fn, ms) {
      return new Promise(function (res, rej) {
         var timer = setTimeout(function () {
@@ -2076,7 +2129,14 @@
                 return;
             }
         } catch (e) {
-            pushMsg('system', '出错了：' + (e && e.message ? e.message : String(e)));
+            var msg = (e && e.message) ? e.message : String(e);
+            pushMsg('system', '出错了：' + msg);
+            // 网络层错误没有状态码，自动跑一遍诊断，把结论补在后面
+            if (isNetworkError(e)) {
+                explainError(e).then(function (detail) {
+                    if (detail && detail !== msg) pushMsg('system', detail);
+                }).catch(function () { });
+            }
         } finally {
             busy = false;
             setBusy(false);

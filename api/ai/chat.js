@@ -294,7 +294,6 @@ function numEnv(env, name, fallback) {
 async function fetchUpstream(url, opts, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  const allRateLimited = errors.length > 0 && errors.every(x => /HTTP\s*429/.test(String(x)));
   const t0 = Date.now();
   try {
     const resp = await fetch(url, { ...opts, signal: ctrl.signal });
@@ -554,6 +553,9 @@ export async function handleAiChat(request, env, corsHeaders) {
   const toolCount = Array.isArray(payload.tools) ? payload.tools.length : 0;
   let payloadBytes = 0;
   try { payloadBytes = JSON.stringify(payload).length; } catch {  }
+  // 必须声明在 handleAiChat 内部：errors 是函数级作用域，
+  // 之前误插到模块级的 fetchUpstream 里会直接 ReferenceError 崩掉整个 Worker。
+  const allRateLimited = errors.length > 0 && errors.every(x => /HTTP\s*429/.test(String(x)));
   return jsonResp({
     // 全是 429 时给一句人话，别让用户面对一串 HTTP 状态码发懵
     error: allRateLimited

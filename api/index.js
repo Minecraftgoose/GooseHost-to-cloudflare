@@ -85,7 +85,7 @@ function makeHandler(inner) {
       // "CORS 头缺少 Access-Control-Allow-Origin"，把真实错误掩盖掉。
       // 生产响应体只返回 requestId，堆栈走日志查。
       const reqId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'n/a';
-      return jsonResp({ error: '服务端内部错误', requestId: reqId }, 500, getCorsHeaders(request));
+      return jsonResp({ error: '服务端内部错误', requestId: reqId }, 500, getCorsHeaders(request, env));
     }
   };
 }
@@ -94,7 +94,7 @@ export default {
     const url = new URL(request.url);
     const method = request.method;
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const corsHeaders = getCorsHeaders(request);
+    const corsHeaders = getCorsHeaders(request, env);
 
     if (method === 'OPTIONS') {
       return new Response('', { status: 200, headers: corsHeaders });
