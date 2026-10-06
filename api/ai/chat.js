@@ -27,13 +27,7 @@ const PROVIDERS = {
     // 官方明确：思维模式下 temperature / presence_penalty / frequency_penalty 不生效
     // （为兼容旧软件不会报错，但会被忽略）。故开启 thinking 时不再透传 temperature，
     // 避免出现「以为调了温度、实际没效果」的误解。
-    noTemperatureWithThinking: true,
-    thinkBody: function (effort) {
-      // reasoning_effort 官方取值 low/high/max，前端传的 medium 不在其中，统一收敛
-      var e = String(effort || 'high').toLowerCase();
-      if (e === 'low' || e === 'max') return { thinking: { type: 'enabled' }, reasoning_effort: e };
-      return { thinking: { type: 'enabled' }, reasoning_effort: 'high' };
-    }
+    noTemperatureWithThinking: true
   },
   // OpenCode Zen：官方精选模型网关（https://opencode.ai/docs/zen）。
   // 鉴权：Authorization: Bearer <登录 opencode.ai/zen 后复制的 API Key>。
@@ -67,14 +61,8 @@ const PROVIDERS = {
     label: 'Agnes',
     baseURL: 'https://api.agnes-ai.cn/v1',
     models: ['agnes-2.5-flash', 'agnes-2.5-pro'],
-    // 深度思考默认开启（见 thinkBodyFor），无需前端显式传 think
     extraBody: {},
-    serverSearch: true,
-    thinkBody: function (effort) {
-      return { thinking: { type: 'enabled' }, reasoning_effort: effort || 'high' };
-    },
-    // 与 DeepSeek 同理：思维模式下 temperature 会被上游忽略，索性不透传
-    noTemperatureWithThinking: true
+    serverSearch: true
   },
   'opencode-zen': {
     label: 'OpenCode Zen',
@@ -150,13 +138,6 @@ function keyChainFor(provider, env) {
 function supportsSearch(provider) {
   if (provider && provider.serverSearch === false) return false;
   return true;
-}
-/** 深度思考参数。默认开启；provider 未声明 thinkBody 时退回通用格式。 */
-function thinkBodyFor(provider, effort) {
-  if (provider && provider.serverSearch === false) return null;   // 显式关闭的 provider 不动
-  if (provider && typeof provider.thinkBody === 'function') return provider.thinkBody(effort);
-  // 通用：OpenAI o-series / GLM 风格。上游不认识该字段时通常直接忽略，不影响主流程。
-  return { thinking: { type: 'enabled' }, reasoning_effort: String(effort || 'high') };
 }
 /** provider 对应的默认模型链 */
 function modelChainFor(provider, env) {
@@ -244,10 +225,6 @@ function buildBody(model, payload, env, stream, providerOverride) {
   // OpenCode Zen 为 {}，不额外注入参数，保持 Chat Completions 兼容）。
   if (provider && provider.extraBody && typeof provider.extraBody === 'object') {
     for (const k of Object.keys(provider.extraBody)) body[k] = provider.extraBody[k];
-  }
-  // 深度思考参数（前端 think:true 时注入）
-  if (payload && payload._thinkExtra) {
-    for (const k of Object.keys(payload._thinkExtra)) body[k] = payload._thinkExtra[k];
   }
   if (Array.isArray(payload.tools) && payload.tools.length) {
     body.tools = payload.tools;
@@ -380,16 +357,6 @@ export async function handleAiChat(request, env, corsHeaders) {
       }
     }
   }
-  // ---- 深度思考：默认开启 ----
-  // 智谱（默认 provider）的 Chat Completions 是否接受 thinking / reasoning_effort
-  // 取决于具体模型版本。若上游报 400（unknown parameter），
-  // 设环境变量 AI_THINKING=off 即可全局关闭，无需改代码。
-  if (payload.think !== false && String(env.AI_THINKING || 'on').toLowerCase() !== 'off') {
-    const effort = String(payload.thinkEffort || 'high');
-    const tb = thinkBodyFor(activeProvider, effort);
-    if (tb) payload._thinkExtra = tb;
-  }
-
   const models = modelChainFor(activeProvider, env);
   // OpenCode Zen：本代理只会发 Chat Completions 格式的请求体，
   // 但 Zen 的 GPT / Grok / Claude / Qwen / Gemini / Jev 走的是别的 endpoint 和别的协议。

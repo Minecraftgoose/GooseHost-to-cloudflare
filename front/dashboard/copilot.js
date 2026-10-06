@@ -83,7 +83,6 @@
             var caps = '<div class="cop-model-div"></div>'
                 + '<div class="cop-model-note">'
                 + '<div><i class="fas fa-globe"></i> 联网检索 · 默认开启</div>'
-                + '<div><i class="fas fa-brain"></i> 深度思考 · 默认开启</div>'
                 + '<div><i class="fas fa-image"></i> 生图 · 说一声就画</div>'
                 + '</div>';
             panel.innerHTML = '<div class="cop-model-title">选择模型</div>' + list + caps
