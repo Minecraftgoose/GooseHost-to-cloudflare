@@ -41,6 +41,7 @@ import {
   handleAdminPlayStats
 } from './admin/play.js';
 
+import { enforceApiKeyScope } from './utils/apikey-scope.js';
 import { handleDebugSyncEmails, handleDebugTestAuth } from './debug.js';
 
 import { handleAiChat } from './ai/chat.js';
@@ -180,6 +181,14 @@ export default {
     // POST /auth/signup - 代理注册
     if (url.pathname === '/auth/signup' && method === 'POST') {
       return await handleSignup(request, env, corsHeaders);  
+    }
+
+    // === API Key 作用域闸门 ===
+    // 只拦截「用 gooseh- 密钥访问白名单外接口」的请求；登录会话不受影响。
+    // 放在这里（所有认证路由之前）是为了让新增接口默认拒绝，必须显式登记才放行。
+    {
+      const blocked = enforceApiKeyScope(request, env, corsHeaders, method, pathParts);
+      if (blocked) return blocked;
     }
 
     // === 需要认证的路由 ===

@@ -1701,6 +1701,12 @@
             justify-content: space-between;
             gap: 0.75rem;
             padding: 0.7rem 0.85rem;
+            /* 负 margin 抵消自身左右 padding：
+               让「内容区」而非「边框」与卡片内容区对齐。
+               否则吊销按钮会比同页其它按钮（如「修改」「新建密钥」）
+               往里缩 0.85rem + 1px 边框 ≈ 15px，几条按钮的右边缘就不在一条线上。 */
+            margin-left: calc(-0.85rem - 1px);
+            margin-right: calc(-0.85rem - 1px);
             margin-bottom: 0.5rem;
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid rgba(2, 255, 142, 0.12);
@@ -1758,7 +1764,17 @@
         .modal-footer { justify-content: flex-end; }
 
         @media (max-width: 600px) {
-            .token-item { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            /* 窄屏改纵向排布：卡片 padding 收到 1rem，
+               条目内边距同步调小，负 margin 仍然精确抵消，
+               保证按钮右边缘与其它卡片里的按钮保持同一条线 */
+            .token-item {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+                padding: 0.6rem;
+                margin-left: calc(-0.6rem - 1px);
+                margin-right: calc(-0.6rem - 1px);
+            }
             .token-item .btn { width: 100%; justify-content: center; }
         }
 

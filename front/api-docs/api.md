@@ -346,19 +346,44 @@ curl https://page.goose.cc.cd/api/my-sites \
 
 #### 1.9.4 密钥的能力边界
 
-为避免一枚长期凭证造成过大破坏面，以下**账号级操作拒绝 API 密钥**，
-仅接受登录会话（返回 `403`）：
+API 密钥**只开放站点管理与文件操作**，其余接口一律返回 `403`。
+采用**白名单**而非黑名单：新增接口默认拒绝，必须显式登记才放行。
 
-| 操作 | 端点 | 密钥可否 |
-|------|------|---------|
-| 查看账号信息 | `GET /api/me` | ✅ 可以 |
-| 站点 CRUD / 文件上传 | `POST /api/create` 等 | ✅ 可以 |
-| 修改昵称 | `PUT /api/me` | ❌ 403 |
-| 注销账号 | `POST /api/delete-account` | ❌ 403 |
-| 管理密钥本身 | `/api/tokens` | ❌ 403 |
+**✅ 允许（CLI / CI 核心用途）**
 
-> 设计原则：密钥用于**资源操作**，不用于**账号变更**。
-> 将来若引入 `scopes` 细分权限，这张表就是默认值。
+| 操作 | 端点 |
+|------|------|
+| 校验密钥 | `GET /api/me` |
+| 站点列表 | `GET /api/my-sites` |
+| 创建 / 更新 / 删除站点 | `POST /api/create`、`/api/update`、`/api/delete` |
+| 读取站点内容 | `GET /api/file/:slug`、`/api/site-files/:slug` |
+| 多文件站点读写删 | `GET` `PUT` `DELETE /api/proj-file/:slug/:path` |
+| 广场只读 | `GET /api/play/posts`、`/api/play/me`、`/api/play/feed` 等 |
+| macOS 审核状态 | `GET /api/macos/status` |
+
+**❌ 拒绝（返回 403）**
+
+| 操作 | 端点 | 原因 |
+|------|------|------|
+| **AI Copilot** | `POST /api/ai/chat` | **按量计费**。开放等于把你的模型额度公开，本服务会变成免费 AI 中转站 |
+| 广场发帖 / 评论 / 点赞 / 关注 | `POST /api/play/*` 写操作 | 以你名义的社交行为，且易被脚本刷 |
+| 修改昵称 | `PUT /api/me` | 账号设置 |
+| 注销账号 | `POST /api/delete-account` | 不可逆 |
+| 管理密钥本身 | `/api/tokens` | 防止凭证自我增殖 |
+| 提交 macOS 审核 | `POST /api/macos/submit` | 以你名义提交申请 |
+| 管理员接口 | `/api/admin/*` | 需管理员身份，与密钥无关 |
+
+**403 响应示例**
+
+```json
+{
+  "error": "该接口不支持 API 密钥，请使用登录会话",
+  "hint": "API 密钥仅用于站点管理与文件操作；AI Copilot、广场互动、账号设置需登录后操作"
+}
+```
+
+> 设计原则：密钥用于**资源操作**，不用于**花钱的、以你名义的、账号级的**操作。
+> 将来若引入 `scopes` 细分权限，这张表就是默认集合。
 
 ---
 
