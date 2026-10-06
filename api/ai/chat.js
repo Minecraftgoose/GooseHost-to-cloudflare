@@ -174,7 +174,9 @@ function modelChainFor(provider, env) {
  */
 async function tavilySearch(query, env) {
   const key = String(env.TAVILY_API_KEY || '').trim();
-  if (!key) return null;
+  // 以前未配置 / 失败都静默返回 null，结果模型直接回「我无法搜索」，
+  // 而用户根本不知道是没配 Key。这里区分状态，交由响应头上报。
+  if (!key) return { state: 'unconfigured', hits: null };
   try {
     const r = await fetch('https://api.tavily.com/search', {
       method: 'POST',
@@ -187,16 +189,16 @@ async function tavilySearch(query, env) {
       }),
       signal: AbortSignal.timeout(15000)
     });
-    if (!r.ok) return null;
+    if (!r.ok) return { state: 'error', hits: null };
     const d = await r.json();
     const list = Array.isArray(d && d.results) ? d.results : [];
-    if (!list.length) return null;
-    return list.slice(0, 5).map(x => ({
+    if (!list.length) return { state: 'empty', hits: null };
+    return { state: 'ok', hits: list.slice(0, 5).map(x => ({
       title: x.title || '',
       url: x.url || '',
       content: String(x.content || '').slice(0, 800)
-    }));
-  } catch { return null; }
+    })) };
+  } catch { return { state: 'error', hits: null }; }
 }
 function injectSearchContext(messages, hits) {
   const brief = hits.map((h, i) =>
@@ -261,7 +263,7 @@ function buildBody(model, payload, env, stream, providerOverride) {
   }
   return body;
 }
-function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, searchUsed) {
+function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, searchUsed, searchState) {
   const h = {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -271,7 +273,9 @@ function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, sea
     'X-Copilot-Model': model
   };
   // 让前端/运维能看出这次到底有没有检索到实时资料（排查用）
+  // 1=检索到资料 0=检索了但没结果 unconfigured=未配置 Key（此时模型当然答不了时效问题）
   if (searchUsed) h['X-Copilot-Search'] = '1';
+  else if (searchState) h['X-Copilot-Search'] = searchState === 'ok' ? '0' : searchState;
   if (typeof elapsedMs === 'number') h['X-Copilot-Elapsed'] = String(elapsedMs);
   if (keyCount > 1) h['X-Copilot-Key'] = `${keyIdx}/${keyCount}`;
   if (errors.length) h['X-Copilot-Fallback'] = errors.join(' | ');
@@ -290,6 +294,7 @@ function numEnv(env, name, fallback) {
 async function fetchUpstream(url, opts, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const allRateLimited = errors.length > 0 && errors.every(x => /HTTP\s*429/.test(String(x)));
   const t0 = Date.now();
   try {
     const resp = await fetch(url, { ...opts, signal: ctrl.signal });
@@ -363,13 +368,15 @@ export async function handleAiChat(request, env, corsHeaders) {
   // 用户不再需要手动开开关：换任何模型都能拿到实时资料。
   // 仅在显式传 search === false 时跳过（保留一个应急关闭口）。
   let searchUsed = false;
+  let searchState = 'unknown';   // ok / empty / error / unconfigured
   if (payload.search !== false && supportsSearch(activeProvider)) {
     const lastUser = [...payload.messages].reverse().find(m => m && m.role === 'user');
     const q = lastUser ? String(lastUser.content || '').slice(0, 500) : '';
     if (q) {
-      const hits = await tavilySearch(q, env);
-      if (hits && hits.length) {
-        payload.messages = injectSearchContext(payload.messages, hits);
+      const sr = await tavilySearch(q, env);
+      searchState = (sr && sr.state) || 'error';
+      if (sr && sr.hits && sr.hits.length) {
+        payload.messages = injectSearchContext(payload.messages, sr.hits);
         searchUsed = true;
       }
     }
@@ -493,9 +500,35 @@ export async function handleAiChat(request, env, corsHeaders) {
       if (r.ok) {
         const elapsed = Date.now() - t0;
         if (r.streamResp) {
-          return new Response(r.streamResp.body, {
+          // 不能裸透传上游 body：上游一旦中途断流（限流/超时/连接重置），
+          // 客户端 fetch 会抛「Error in input stream」这种看不懂的原生错误。
+          // 这里做一层隔离：断流时补发一条可读的 SSE 事件再正常收尾，
+          // 客户端就能把它当普通消息显示，而不是整个请求炸掉。
+          const src = r.streamResp.body;
+          const reader = src.getReader();
+          const enc = new TextEncoder();
+          const guarded = new ReadableStream({
+            async pull(ctrl) {
+              try {
+                const { done, value } = await reader.read();
+                if (done) { ctrl.close(); return; }
+                ctrl.enqueue(value);
+              } catch (e) {
+                const msg = (e && e.message) ? e.message : String(e);
+                try {
+                  ctrl.enqueue(enc.encode('data: ' + JSON.stringify({
+                    choices: [{ delta: { content: '\n\n> 上游连接中断：' + msg + '（已收到的内容仍然有效）' } }]
+                  }) + '\n\n'));
+                  ctrl.enqueue(enc.encode('data: [DONE]\n\n'));
+                } catch (_) { }
+                try { ctrl.close(); } catch (_) { }
+              }
+            },
+            cancel(reason) { try { reader.cancel(reason); } catch (_) { } }
+          });
+          return new Response(guarded, {
             status: 200,
-            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed, searchUsed)
+            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed, searchUsed, searchState)
           });
         }
         const headers = {
@@ -507,6 +540,7 @@ export async function handleAiChat(request, env, corsHeaders) {
         if (keyList.length > 1) headers['X-Copilot-Key'] = `${r.keyIdx}/${keyList.length}`;
         if (errors.length) headers['X-Copilot-Fallback'] = errors.join(' | ');
         if (searchUsed) headers['X-Copilot-Search'] = '1';
+        else if (searchState) headers['X-Copilot-Search'] = searchState === 'ok' ? '0' : searchState;
         return new Response(r.text, { status: r.status, headers });
       }
       if (r.fatalModel) break;
@@ -521,7 +555,12 @@ export async function handleAiChat(request, env, corsHeaders) {
   let payloadBytes = 0;
   try { payloadBytes = JSON.stringify(payload).length; } catch {  }
   return jsonResp({
-    error: '所有模型与 API Key 均调用失败',
+    // 全是 429 时给一句人话，别让用户面对一串 HTTP 状态码发懵
+    error: allRateLimited
+      ? '上游限流，暂时无法响应。请稍后再试，或在服务端为该引擎补充更多可用 Key（逗号分隔）。'
+      : '所有模型与 API Key 均调用失败',
+    // 1015 是 Cloudflare 的标准限流码：说明上游站点前面挂了 CF 且已触发配额/速率限制
+    rateLimited: allRateLimited || undefined,
     tried: errors,
     models,
     elapsedMs: Date.now() - t0,

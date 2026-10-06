@@ -28,6 +28,7 @@
     ];
     var ENGINE_KEY = 'cop_engine_v1';
     var currentEngine = ENGINES[0];
+    var searchHintShown = false;   // 「未配置联网检索」提示只弹一次，避免刷屏
 
     function loadEnginePref() {
         try {
@@ -1865,6 +1866,15 @@
         }
         var used = res.headers.get('X-Copilot-Model');
         if (used && cb.onModel) cb.onModel(used);
+        // 联网检索状态：未配置 Key 时明确告诉用户，
+        // 否则模型只会说「我无法搜索」，用户根本不知道是配置问题
+        var srch = res.headers.get('X-Copilot-Search');
+        if (srch === 'unconfigured' && !searchHintShown) {
+            searchHintShown = true;
+            pushMsg('system', '联网检索未生效：服务端还没配置 TAVILY_API_KEY，'
+                + '模型拿不到实时资料才会说「无法搜索」。'
+                + '在 Cloudflare Workers 环境变量里配置后重新部署即可。');
+        }
         if (!res.ok) {
             var data = null;
             try { data = await res.json(); } catch (e) { }
