@@ -12,6 +12,7 @@ import { handleMacosSubmit, handleMacosStatus } from './macos.js';
 import { handleForgotPassword } from './auth/forgot-password.js';
 import { handleResetPassword } from './auth/reset-password.js';
 import { handleDeleteAccount } from './auth/delete-account.js';
+import { handleListTokens, handleCreateToken, handleRevokeToken } from './auth/tokens.js';
 
 import { handleCreate } from './sites/create.js';
 import { handleUpdate } from './sites/update.js';
@@ -137,6 +138,23 @@ export default {
     // PUT /api/me - 更新当前用户昵称
     if (url.pathname === '/api/me' && method === 'PUT') {
       return await handleUpdateMe(request, env, corsHeaders);
+    }
+
+    // === API Key 管理（需登录会话，不接受用 Key 自我增殖） ===
+
+    // GET /api/tokens - 列出当前账号的 API Key（仅脱敏串）
+    if (url.pathname === '/api/tokens' && method === 'GET') {
+      return await handleListTokens(request, env, corsHeaders);
+    }
+
+    // POST /api/tokens - 创建 API Key，明文仅本次返回
+    if (url.pathname === '/api/tokens' && method === 'POST') {
+      return await handleCreateToken(request, env, corsHeaders);
+    }
+
+    // DELETE /api/tokens/:id - 吊销 API Key
+    if (pathParts[0] === 'api' && pathParts[1] === 'tokens' && pathParts[2] && !pathParts[3] && method === 'DELETE') {
+      return await handleRevokeToken(request, env, corsHeaders, pathParts[2]);
     }
 
     // POST /api/macos/submit - 提交站点到 macOS 开发者计划

@@ -457,6 +457,33 @@
                     </div>
                 </div>
 
+                <!-- ===== API 密钥 ===== -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-key"></i> API 密钥
+                            <span id="tokenCount" style="margin-left:0.5rem; font-size:0.72rem; color:rgba(255,255,255,0.35); font-weight:400;">0 / 20</span>
+                        </div>
+                        <button class="btn btn-sm" id="createTokenBtn" onclick="showCreateTokenModal()" style="border:1px solid var(--border-focus); background:transparent; color:var(--accent);">
+                            <i class="fas fa-plus"></i> 新建密钥
+                        </button>
+                    </div>
+
+                    <div class="setting-item" style="align-items:flex-start; border:none; padding-top:0.25rem;">
+                        <div class="setting-info">
+                            <div class="setting-title">用于 CLI 与脚本调用</div>
+                            <div class="setting-desc">
+                                长期有效、不会因登录会话刷新而失效，适合命令行工具与自动化脚本。
+                                密钥仅创建时显示一次，请妥善保存；泄露后可随时吊销。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tokenList" style="margin-top:0.5rem;">
+                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中…</div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title"><i class="fas fa-sign-out-alt"></i> 退出登录</div>
@@ -504,6 +531,70 @@
                  重建聊天区 + 右侧栏（文件 / 终端）骨架。 -->
             <div class="page" id="page-copilot"></div>
         </main>
+    </div>
+
+    <!-- ===== API 密钥：创建弹窗 ===== -->
+    <div id="tokenCreateModal" class="modal">
+        <div class="modal-content card" style="padding: 0; max-width: 560px;">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-key"></i> 新建 API 密钥</div>
+                <button class="modal-close" onclick="closeTokenCreateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">名称（可选，便于区分用途）</label>
+                    <input type="text" id="tokenName" class="form-input" maxlength="40"
+                           placeholder="例如：我的笔记本 CLI" autocomplete="off">
+                </div>
+                <div style="font-size: 0.78rem; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 0.3rem;">
+                    <i class="fas fa-info-circle"></i> 密钥长期有效，仅在此次创建后显示一次
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTokenCreateModal()">取消</button>
+                <button class="btn btn-primary" id="tokenCreateBtn" onclick="createToken()">
+                    <i class="fas fa-plus"></i> 创建
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== API 密钥：明文展示（仅一次） ===== -->
+    <div id="tokenShowModal" class="modal">
+        <div class="modal-content card" style="padding: 0; max-width: 620px;">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-shield-alt"></i> 请立即保存你的密钥</div>
+                <button class="modal-close" onclick="closeTokenShowModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="padding: 0.6rem 0.75rem; border-radius: 8px; margin-bottom: 0.75rem;
+                            background: rgba(2,255,142,0.08); border: 1px solid rgba(2,255,142,0.25);
+                            font-size: 0.8rem; color: rgba(255,255,255,0.7); display: flex; gap: 0.4rem;">
+                    <i class="fas fa-exclamation-triangle" style="color:#02ff8e; margin-top:2px;"></i>
+                    <span>关闭此窗口后将<b style="color:#02ff8e;">无法再次查看</b>完整密钥。若遗失，请吊销后重新创建。</span>
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:stretch;">
+                    <code id="tokenPlain" style="flex:1; padding:0.7rem 0.8rem; border-radius:8px; word-break:break-all;
+                          background:rgba(0,0,0,0.4); border:1px solid rgba(2,255,142,0.25);
+                          font-family:Consolas,'Courier New',monospace; font-size:0.85rem; color:#02ff8e;
+                          user-select:all;"></code>
+                    <button class="btn btn-sm" onclick="copyTokenPlain()" style="border:1px solid var(--border-focus); background:transparent; color:var(--accent); white-space:nowrap;">
+                        <i class="fas fa-copy"></i> 复制
+                    </button>
+                </div>
+                <div style="margin-top:0.9rem; font-size:0.78rem; color:rgba(255,255,255,0.45);">
+                    使用方式：
+                    <code style="display:block; margin-top:0.35rem; padding:0.5rem 0.65rem; border-radius:6px;
+                                 background:rgba(0,0,0,0.35); color:rgba(255,255,255,0.75); font-size:0.75rem;
+                                 word-break:break-all;">
+                        Authorization: Bearer <span id="tokenPlainEcho" style="color:#02ff8e;"></span>
+                    </code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeTokenShowModal()">我已保存</button>
+            </div>
+        </div>
     </div>
 
     <!-- 编辑弹窗 -->

@@ -110,6 +110,7 @@
             closeSidebar();
 
             if (page === 'sites') loadSites();
+            if (page === 'account') loadTokens();
             if (page === 'deploy') updateEditorVisibility();
 
             runPageTypewriter(page);
@@ -267,6 +268,173 @@
             localStorage.removeItem('sb_token');
             localStorage.removeItem('sb_user');
             location.href = '/login/';
+        }
+
+        /* ================= API 密钥管理 =================
+           Key 形如 gooseh-<33位base58>，服务端只存 sha256 摘要，
+           明文仅在创建响应里返回一次 —— 所以这里必须提醒用户立刻保存。
+
+           注意：密钥的创建/吊销属于「账号管理」操作，必须走登录会话，
+           不允许用 API Key 自己管自己（后端也会拒绝）。
+           apiFetch 携带的是 sb_token，天然满足这一点。 */
+
+        const TOKEN_MAX = 20;
+
+        function tokenTime(iso) {
+            if (!iso) return '从未使用';
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '从未使用';
+            const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+            if (diff < 60) return '刚刚';
+            if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+            if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+            if (diff < 2592000) return Math.floor(diff / 86400) + ' 天前';
+            return d.toLocaleDateString('zh-CN');
+        }
+
+        function tokenEscape(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+        }
+
+        async function loadTokens() {
+            const box = document.getElementById('tokenList');
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,255,255,0.35); padding:0.5rem 0;">'
+                + '<i class="fas fa-spinner fa-spin"></i> 载入中...</div>';
+            try {
+                const res = await apiFetch(API_URL + '/api/tokens');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,120,120,0.8); padding:0.5rem 0;">'
+                        + '<i class="fas fa-triangle-exclamation"></i> ' + tokenEscape(data.error || '载入失败') + '</div>';
+                    return;
+                }
+                const list = data.keys || [];
+                const cnt = document.getElementById('tokenCount');
+                if (cnt) cnt.textContent = list.length + ' / ' + TOKEN_MAX;
+                const btn = document.getElementById('createTokenBtn');
+                if (btn) btn.disabled = list.length >= TOKEN_MAX;
+
+                if (!list.length) {
+                    box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,255,255,0.35); padding:0.5rem 0;">'
+                        + '还没有 API 密钥。创建一个即可在 CLI 或脚本中长期调用，无需反复登录。</div>';
+                    return;
+                }
+                box.innerHTML = list.map(k => `
+                    <div class="token-item">
+                        <div class="token-item-main">
+                            <div class="token-item-name">
+                                <i class="fas fa-key"></i>
+                                ${tokenEscape(k.name || '未命名')}
+                            </div>
+                            <div class="token-item-meta">
+                                <code>${tokenEscape(k.masked || '')}</code>
+                                <span>·</span> 创建于 ${tokenTime(k.createdAt)}
+                                <span>·</span> 最近使用 ${tokenTime(k.lastUsedAt)}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="revokeToken('${tokenEscape(k.id)}')">
+                            <i class="fas fa-trash"></i> 吊销
+                        </button>
+                    </div>`).join('');
+            } catch (e) {
+                box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,120,120,0.8); padding:0.5rem 0;">'
+                    + '<i class="fas fa-triangle-exclamation"></i> 网络错误</div>';
+            }
+        }
+
+        function showCreateTokenModal() {
+            const m = document.getElementById('tokenCreateModal');
+            const inp = document.getElementById('tokenName');
+            if (inp) inp.value = '';
+            if (m) m.classList.add('active');
+            setTimeout(() => inp && inp.focus(), 80);
+        }
+        function closeTokenCreateModal() {
+            const m = document.getElementById('tokenCreateModal');
+            if (m) m.classList.remove('active');
+        }
+
+        async function createToken() {
+            const btn = document.getElementById('tokenCreateBtn');
+            const nameEl = document.getElementById('tokenName');
+            const name = nameEl ? nameEl.value.trim() : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 创建中...'; }
+            try {
+                const res = await apiFetch(API_URL + '/api/tokens', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.key) {
+                    closeTokenCreateModal();
+                    showTokenPlain(data.key);
+                    await loadTokens();
+                } else {
+                    showToast(data.error || '创建失败', 'error');
+                }
+            } catch (e) {
+                showToast('网络错误', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus"></i> 创建'; }
+            }
+        }
+
+        function showTokenPlain(key) {
+            const m = document.getElementById('tokenShowModal');
+            const code = document.getElementById('tokenPlain');
+            const echo = document.getElementById('tokenPlainEcho');
+            if (code) code.textContent = key;
+            if (echo) echo.textContent = key;
+            if (m) m.classList.add('active');
+        }
+        function closeTokenShowModal() {
+            const m = document.getElementById('tokenShowModal');
+            if (m) m.classList.remove('active');
+        }
+
+        async function copyTokenPlain() {
+            const code = document.getElementById('tokenPlain');
+            const txt = code ? code.textContent : '';
+            if (!txt) return;
+            try {
+                await navigator.clipboard.writeText(txt);
+                showToast('已复制到剪贴板');
+            } catch (e) {
+                // 降级：老浏览器 / 非 HTTPS 环境
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = txt;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast('已复制到剪贴板');
+                } catch (e2) {
+                    showToast('复制失败，请手动选中', 'error');
+                }
+            }
+        }
+
+        async function revokeToken(id) {
+            if (!confirm('吊销后使用该密钥的程序将立即失效，且无法恢复。确定吊销？')) return;
+            try {
+                const res = await apiFetch(API_URL + '/api/tokens/' + encodeURIComponent(id), { method: 'DELETE' });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    showToast('已吊销');
+                    await loadTokens();
+                } else {
+                    showToast(data.error || '吊销失败', 'error');
+                }
+            } catch (e) {
+                showToast('网络错误', 'error');
+            }
         }
 
         function confirmDeleteAccount() {

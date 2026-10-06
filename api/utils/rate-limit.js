@@ -15,6 +15,7 @@ const RATE_LIMIT = {
   ai_chat:      { limit: 30,  windowSec: 60 },           // AI Copilot：每 IP 每分钟最多 30 次
   play_write:   { limit: 40,  windowSec: 60 },           // 广场写操作：发帖/点赞/关注/改资料
   play_comment: { limit: 20,  windowSec: 60 },           // 广场评论：每 IP 每分钟最多 20 条
+  token_manage: { limit: 10,  windowSec: 60 },           // API Key 增删改：每 IP 每分钟最多 10 次
                                                          // （一轮建站对话内部最多 12 轮请求，
                                                          //   30 次留给正常交互，同时挡住脚本刷 key）
 };

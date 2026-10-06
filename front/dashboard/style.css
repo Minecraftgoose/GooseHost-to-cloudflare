@@ -1673,6 +1673,74 @@
             text-decoration: underline;
         }
 
+        /* ===== API 密钥列表 ===== */
+        .token-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.7rem 0.85rem;
+            margin-bottom: 0.5rem;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(2, 255, 142, 0.12);
+            border-radius: 10px;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .token-item:hover {
+            border-color: rgba(2, 255, 142, 0.28);
+            background: rgba(2, 255, 142, 0.04);
+        }
+        .token-item-main { min-width: 0; flex: 1; }
+        .token-item-name {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .token-item-name i { color: #02ff8e; font-size: 0.8rem; flex: none; }
+        .token-item-meta {
+            margin-top: 0.25rem;
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.35);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+        .token-item-meta code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: rgba(255, 255, 255, 0.55);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.05rem 0.35rem;
+            border-radius: 4px;
+        }
+
+        /* 表单输入：弹窗内的单行输入 */
+        .form-input {
+            width: 100%;
+            padding: 0.65rem 0.8rem;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(2, 255, 142, 0.18);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .form-input:focus { border-color: rgba(2, 255, 142, 0.5); }
+
+        /* 弹窗底部按钮靠右 */
+        .modal-footer { justify-content: flex-end; }
+
+        @media (max-width: 600px) {
+            .token-item { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            .token-item .btn { width: 100%; justify-content: center; }
+        }
+
         /* ===== 图标微动效 ===== */
         i.fas, i.far, i.fab {
             transition: color 0.15s ease, transform 0.15s ease;

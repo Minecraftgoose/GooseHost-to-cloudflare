@@ -13,3 +13,9 @@ AI_MAX_TOKENS = "4096"
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "12b92271a0a44fa692fa99e2a639a5f9"
+
+# API Key 存储（保存的是 SHA-256 摘要，不是明文）
+# Namespace: API_KEYS_KV
+[[kv_namespaces]]
+binding = "API_KEYS_KV"
+id = "a660a8cd825a488abe4cb38620450578"
