@@ -27,7 +27,13 @@ const PROVIDERS = {
     // 官方明确：思维模式下 temperature / presence_penalty / frequency_penalty 不生效
     // （为兼容旧软件不会报错，但会被忽略）。故开启 thinking 时不再透传 temperature，
     // 避免出现「以为调了温度、实际没效果」的误解。
-    noTemperatureWithThinking: true
+    noTemperatureWithThinking: true,
+    thinkBody: function (effort) {
+      // reasoning_effort 官方取值 low/high/max，前端传的 medium 不在其中，统一收敛
+      var e = String(effort || 'high').toLowerCase();
+      if (e === 'low' || e === 'max') return { thinking: { type: 'enabled' }, reasoning_effort: e };
+      return { thinking: { type: 'enabled' }, reasoning_effort: 'high' };
+    }
   },
   // OpenCode Zen：官方精选模型网关（https://opencode.ai/docs/zen）。
   // 鉴权：Authorization: Bearer <登录 opencode.ai/zen 后复制的 API Key>。
@@ -61,11 +67,14 @@ const PROVIDERS = {
     label: 'Agnes',
     baseURL: 'https://api.agnes-ai.cn/v1',
     models: ['agnes-2.5-flash', 'agnes-2.5-pro'],
-    // 深度思考：由前端 think:true 显式开启时才注入，默认不注入
+    // 深度思考默认开启（见 thinkBodyFor），无需前端显式传 think
     extraBody: {},
-    // 服务端侧能力：联网搜索由本 Worker 调 Tavily 注入上下文，
-    // 不依赖模型是否支持 tool calling —— 兼容性更好。
-    serverSearch: true
+    serverSearch: true,
+    thinkBody: function (effort) {
+      return { thinking: { type: 'enabled' }, reasoning_effort: effort || 'high' };
+    },
+    // 与 DeepSeek 同理：思维模式下 temperature 会被上游忽略，索性不透传
+    noTemperatureWithThinking: true
   },
   'opencode-zen': {
     label: 'OpenCode Zen',
@@ -131,6 +140,23 @@ function keyChainFor(provider, env) {
       .split(',').map(s => s.trim()).filter(Boolean);
   }
   return keyChain(env);
+}
+/**
+ * 是否做联网检索注入。
+ * 统一默认开启：不管选哪个模型，都能拿到实时资料，
+ * 用户不需要也不应该去勾开关（前端已移除该选项）。
+ * 只有 provider 显式声明 serverSearch === false 才跳过。
+ */
+function supportsSearch(provider) {
+  if (provider && provider.serverSearch === false) return false;
+  return true;
+}
+/** 深度思考参数。默认开启；provider 未声明 thinkBody 时退回通用格式。 */
+function thinkBodyFor(provider, effort) {
+  if (provider && provider.serverSearch === false) return null;   // 显式关闭的 provider 不动
+  if (provider && typeof provider.thinkBody === 'function') return provider.thinkBody(effort);
+  // 通用：OpenAI o-series / GLM 风格。上游不认识该字段时通常直接忽略，不影响主流程。
+  return { thinking: { type: 'enabled' }, reasoning_effort: String(effort || 'high') };
 }
 /** provider 对应的默认模型链 */
 function modelChainFor(provider, env) {
@@ -235,7 +261,7 @@ function buildBody(model, payload, env, stream, providerOverride) {
   }
   return body;
 }
-function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs) {
+function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, searchUsed) {
   const h = {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -244,6 +270,8 @@ function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs) {
     ...corsHeaders,
     'X-Copilot-Model': model
   };
+  // 让前端/运维能看出这次到底有没有检索到实时资料（排查用）
+  if (searchUsed) h['X-Copilot-Search'] = '1';
   if (typeof elapsedMs === 'number') h['X-Copilot-Elapsed'] = String(elapsedMs);
   if (keyCount > 1) h['X-Copilot-Key'] = `${keyIdx}/${keyCount}`;
   if (errors.length) h['X-Copilot-Fallback'] = errors.join(' | ');
@@ -331,9 +359,11 @@ export async function handleAiChat(request, env, corsHeaders) {
     }, 500, corsHeaders);
   }
 
-  // ---- 联网搜索：服务端检索后注入上下文 ----
+  // ---- 联网搜索：默认开启，服务端检索后注入上下文 ----
+  // 用户不再需要手动开开关：换任何模型都能拿到实时资料。
+  // 仅在显式传 search === false 时跳过（保留一个应急关闭口）。
   let searchUsed = false;
-  if (payload.search === true && activeProvider && activeProvider.serverSearch) {
+  if (payload.search !== false && supportsSearch(activeProvider)) {
     const lastUser = [...payload.messages].reverse().find(m => m && m.role === 'user');
     const q = lastUser ? String(lastUser.content || '').slice(0, 500) : '';
     if (q) {
@@ -344,10 +374,14 @@ export async function handleAiChat(request, env, corsHeaders) {
       }
     }
   }
-  // ---- 深度思考：仅显式开启时注入 ----
-  if (payload.think === true) {
+  // ---- 深度思考：默认开启 ----
+  // 智谱（默认 provider）的 Chat Completions 是否接受 thinking / reasoning_effort
+  // 取决于具体模型版本。若上游报 400（unknown parameter），
+  // 设环境变量 AI_THINKING=off 即可全局关闭，无需改代码。
+  if (payload.think !== false && String(env.AI_THINKING || 'on').toLowerCase() !== 'off') {
     const effort = String(payload.thinkEffort || 'high');
-    payload._thinkExtra = { thinking: { type: 'enabled' }, reasoning_effort: effort };
+    const tb = thinkBodyFor(activeProvider, effort);
+    if (tb) payload._thinkExtra = tb;
   }
 
   const models = modelChainFor(activeProvider, env);
@@ -461,7 +495,7 @@ export async function handleAiChat(request, env, corsHeaders) {
         if (r.streamResp) {
           return new Response(r.streamResp.body, {
             status: 200,
-            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed)
+            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed, searchUsed)
           });
         }
         const headers = {
@@ -472,6 +506,7 @@ export async function handleAiChat(request, env, corsHeaders) {
         };
         if (keyList.length > 1) headers['X-Copilot-Key'] = `${r.keyIdx}/${keyList.length}`;
         if (errors.length) headers['X-Copilot-Fallback'] = errors.join(' | ');
+        if (searchUsed) headers['X-Copilot-Search'] = '1';
         return new Response(r.text, { status: r.status, headers });
       }
       if (r.fatalModel) break;

@@ -20,6 +20,7 @@ function getCorsHeaders(request) {
       'X-Copilot-Model',
       'X-Copilot-Key',
       'X-Copilot-Fallback',
+      'X-Copilot-Search',
       'X-Copilot-Elapsed',
       'Retry-After'
     ].join(', '),

@@ -348,6 +348,27 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.cop-model-note {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 2px 2px 4px;
+}
+.cop-model-note > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.42);
+}
+.cop-model-note i {
+    width: 13px;
+    text-align: center;
+    color: var(--gai-brand);
+    opacity: .75;
+    flex-shrink: 0;
+}
+
 .cop-model-foot {
     margin-top: 9px;
     padding-top: 7px;

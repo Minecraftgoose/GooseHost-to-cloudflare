@@ -14,40 +14,32 @@
          · goose —— 原有 GooseHost Copilot，带建站工具链，服务端默认 provider
          · agnes —— 外部融合模型，支持联网检索、深度思考、生图
        前端只发「引擎标识 + 模型名」，Key 全在后端环境变量里，永不外泄。 */
+    /* ===== 模型（唯一需要用户选的东西）=====
+       能力不再按引擎割裂：联网检索与深度思考由服务端默认开启（换哪个模型都有），
+       生图与建站一样是「工具」，由模型自己判断要不要调。
+       所以这里只描述模型本身，不再有 caps / 模式 / 开关。 */
     var ENGINES = [
-        { id: 'goose',  label: 'GooseHost Copilot', desc: '建站工具链 · 生成并部署站点',
-          provider: null,    model: null,              tools: true,  caps: {} },
-        { id: 'agnes-flash', label: 'Agnes Flash', desc: '联网 · 生图 · 深度思考',
-          provider: 'agnes', model: 'agnes-2.5-flash', tools: false, caps: { search: 1, think: 1, image: 1 } },
-        { id: 'agnes-pro',   label: 'Agnes Pro',   desc: '更强推理 · 同样支持联网与生图',
-          provider: 'agnes', model: 'agnes-2.5-pro',   tools: false, caps: { search: 1, think: 1, image: 1 } }
+        { id: 'goose',       label: 'GooseHost Copilot', desc: '默认模型 · 建站工具链最稳',
+          provider: null,    model: null,              tools: true },
+        { id: 'agnes-flash', label: 'Agnes Flash',      desc: '响应更快 · 通用对话',
+          provider: 'agnes', model: 'agnes-2.5-flash', tools: true },
+        { id: 'agnes-pro',   label: 'Agnes Pro',        desc: '推理更强 · 通用对话',
+          provider: 'agnes', model: 'agnes-2.5-pro',   tools: true }
     ];
     var ENGINE_KEY = 'cop_engine_v1';
-    var OPT_KEY = 'cop_engine_opts_v1';
     var currentEngine = ENGINES[0];
-    var engineOpts = { search: false, think: false, mode: 'chat' };
 
     function loadEnginePref() {
         try {
             var id = localStorage.getItem(ENGINE_KEY);
             var found = ENGINES.filter(function (e) { return e.id === id; })[0];
             if (found) currentEngine = found;
-            var o = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
-            if (o && typeof o === 'object') {
-                engineOpts.search = !!o.search;
-                engineOpts.think = !!o.think;
-                engineOpts.mode = (o.mode === 'image') ? 'image' : 'chat';
-            }
         } catch (e) { }
     }
     function saveEnginePref() {
-        try {
-            localStorage.setItem(ENGINE_KEY, currentEngine.id);
-            localStorage.setItem(OPT_KEY, JSON.stringify(engineOpts));
-        } catch (e) { }
+        try { localStorage.setItem(ENGINE_KEY, currentEngine.id); } catch (e) { }
     }
     function isAgnes() { return currentEngine.provider === 'agnes'; }
-    function hasCap(name) { return !!(currentEngine.caps && currentEngine.caps[name]); }
 
     /* ===== 模型选择器 UI =====
        位置：输入框上方（原「赞美Minecraft_goose」chip 所在的那一行）。
@@ -72,10 +64,8 @@
         bar.parentNode.insertBefore(panel, bar.nextSibling);
 
         function renderChip() {
-            var modeTag = (hasCap('image') && engineOpts.mode === 'image') ? ' · 生图' : '';
             chip.innerHTML = '<i class="fas fa-cube"></i> '
-                + esc(currentEngine.label) + modeTag + ' <span class="cop-model-caret">▾</span>';
-            chip.classList.toggle('is-image', hasCap('image') && engineOpts.mode === 'image');
+                + esc(currentEngine.label) + ' <span class="cop-model-caret">▾</span>';
             chip.setAttribute('aria-expanded', panel.style.display === 'none' ? 'false' : 'true');
         }
         function renderPanel() {
@@ -88,26 +78,14 @@
                     + '</button>';
             }).join('');
 
-            var caps = '';
-            if (hasCap('search') || hasCap('think') || hasCap('image')) {
-                var seg = hasCap('image')
-                    ? '<div class="cop-model-row"><span class="cop-model-rowt">模式</span>'
-                        + '<div class="cop-seg">'
-                        + '<button type="button" class="cop-seg-btn' + (engineOpts.mode === 'chat' ? ' on' : '') + '" data-mode="chat">对话</button>'
-                        + '<button type="button" class="cop-seg-btn' + (engineOpts.mode === 'image' ? ' on' : '') + '" data-mode="image">生图</button>'
-                        + '</div></div>'
-                    : '';
-                var srow = hasCap('search')
-                    ? '<label class="cop-model-sw"><input type="checkbox" id="copOptSearch"' + (engineOpts.search ? ' checked' : '') + '><span>联网搜索</span>'
-                        + '<i>检索实时资料并标注来源</i></label>'
-                    : '';
-                var trow = (hasCap('think') && engineOpts.mode !== 'image')
-                    ? '<label class="cop-model-sw"><input type="checkbox" id="copOptThink"' + (engineOpts.think ? ' checked' : '') + '><span>深度思考</span>'
-                        + '<i>先推理再作答，响应更慢但更稳</i></label>'
-                    : '';
-                caps = '<div class="cop-model-div"></div>' + seg + srow + trow;
-            }
-            panel.innerHTML = '<div class="cop-model-title">选择引擎</div>' + list + caps
+            // 能力说明只读：联网检索 / 深度思考默认开启，生图由模型按需调用工具
+            var caps = '<div class="cop-model-div"></div>'
+                + '<div class="cop-model-note">'
+                + '<div><i class="fas fa-globe"></i> 联网检索 · 默认开启</div>'
+                + '<div><i class="fas fa-brain"></i> 深度思考 · 默认开启</div>'
+                + '<div><i class="fas fa-image"></i> 生图 · 说一声就画</div>'
+                + '</div>';
+            panel.innerHTML = '<div class="cop-model-title">选择模型</div>' + list + caps
                 + '<div class="cop-model-foot">模型密钥保存在服务端，前端不接触</div>';
 
             Array.prototype.forEach.call(panel.querySelectorAll('.cop-model-item'), function (b) {
@@ -120,33 +98,10 @@
                     var e = ENGINES.filter(function (x) { return x.id === id; })[0];
                     if (!e) return;
                     currentEngine = e;
-                    // 切到不支持生图/搜索的引擎时收敛开关，避免留下无效状态
-                    if (!hasCap('image')) engineOpts.mode = 'chat';
-                    if (!hasCap('search')) engineOpts.search = false;
-                    if (!hasCap('think')) engineOpts.think = false;
                     saveEnginePref();
                     renderChip(); renderPanel();
                 };
             });
-            Array.prototype.forEach.call(panel.querySelectorAll('.cop-seg-btn'), function (b) {
-                b.onclick = function (ev) {
-                    if (ev && ev.stopPropagation) ev.stopPropagation();
-                    engineOpts.mode = b.getAttribute('data-mode') === 'image' ? 'image' : 'chat';
-                    saveEnginePref();
-                    renderChip(); renderPanel();
-                    syncPlaceholder();
-                };
-            });
-            var cs = document.getElementById('copOptSearch');
-            if (cs) {
-                cs.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); };
-                cs.onchange = function () { engineOpts.search = cs.checked; saveEnginePref(); };
-            }
-            var ct = document.getElementById('copOptThink');
-            if (ct) {
-                ct.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); };
-                ct.onchange = function () { engineOpts.think = ct.checked; saveEnginePref(); };
-            }
         }
         chip.onclick = function (e) {
             e.stopPropagation();
@@ -178,24 +133,19 @@
     function syncPlaceholder() {
         var input = document.getElementById('copInput');
         if (!input) return;
-        input.placeholder = (hasCap('image') && engineOpts.mode === 'image')
-            ? '描述你想生成的画面，Enter 发送'
-            : '描述你想要的页面，Enter 发送';
+        // 一句话既能建站也能生图：具体做什么由模型自己判断并调工具
+        input.placeholder = '描述你想要的页面，或说「画一张…」，Enter 发送';
     }
 
     function buildChatBody(messages, stream) {
         var body = { messages: messages, temperature: 0.3 };
-        // 建站工具链只有 GooseHost Copilot 用；Agnes 是通用对话，不带工具
-        if (currentEngine.tools) body.tools = TOOLS;
+        // 工具对所有模型开放：建站文件工具 + 生图工具一视同仁，
+        // 用不用、什么时候用由模型自己判断，用户不需要切模式。
+        body.tools = TOOLS;
         if (currentEngine.provider) body.provider = currentEngine.provider;
         if (currentEngine.model) body.model = currentEngine.model;
-        if (isAgnes()) {
-            if (hasCap('search') && engineOpts.search) body.search = true;
-            if (hasCap('think') && engineOpts.think) {
-                body.think = true;
-                body.thinkEffort = engineOpts.effort || 'high';
-            }
-        }
+        // 联网检索与深度思考：服务端默认开启（换哪个模型都有），
+        // 这里不传开关，避免前端状态和服务端行为不一致。
         if (stream) body.stream = true;
         return JSON.stringify(body);
     }
@@ -975,6 +925,143 @@
 		'GooseHost 是一个面向新手、极简操作、基于 Cloudflare + Supabase 架构的开源静态托管平台，适合快速分享 HTML/Markdown 页面或小型前端项目，无需服务器、无需命令行，粘贴代码即可全球 CDN 加速访问。',
 		'当用户询问你关于GooseHost的问题时根据以上内容回答'
     ].join('\n');
+    /* ===== 文本工具协议（Agnes 等不支持原生 function calling 的引擎）=====
+       这类引擎会把工具调用以文本形式吐出来，例如：
+           <tool_call>
+           <function=list_my_sites>
+           {}
+           </function>
+           </tool_call>
+       以前前端完全不认识，于是 ① 原始标签直接渲染给用户看 ② 工具根本没执行
+       ③ 还误报「不支持 function calling」。
+       现在：解析 → 真执行 → 结果回喂模型 → 继续对话，标签从展示文本里剔除。 */
+    var TOOL_CALL_RE = /<tool_call>([\s\S]*?)<\/tool_call>/gi;
+    var FN_RE = /<function=([A-Za-z_][A-Za-z0-9_]*)>([\s\S]*?)<\/function>/gi;
+    var FN_LOOSE_RE = /<function=([A-Za-z_][A-Za-z0-9_]*)>([\s\S]*?)(?=<\/function>|<tool_call>|$)/gi;
+
+    function stripToolCallText(text) {
+        var s = String(text == null ? '' : text);
+        if (!s) return '';
+        s = s.replace(TOOL_CALL_RE, '');
+        var i = s.search(/<tool_call>/i);
+        if (i >= 0) s = s.slice(0, i);           // 流式中途：还没闭合，先整段藏起来
+        var j = s.search(/<function=/i);
+        if (j >= 0) s = s.slice(0, j);           // 只有内层标签的兜底
+        return s.replace(/\s+$/, '');
+    }
+
+    function repairJson(t) {
+        // 流式/截断场景常见：JSON 被切了一半。逐步回退到最后一个合法边界再试。
+        var s = String(t || '').trim();
+        if (!s) return null;
+        var tries = [s];
+        var q = s.lastIndexOf('"');
+        if (q > 0) tries.push(s.slice(0, q + 1) + '}');
+        var b = s.lastIndexOf('}');
+        if (b > 0) tries.push(s.slice(0, b + 1));
+        for (var i = 0; i < tries.length; i++) {
+            try { var v = JSON.parse(tries[i]); if (v && typeof v === 'object') return v; } catch (e) { }
+        }
+        return null;
+    }
+
+    function parseToolArgs(raw) {
+        var t = String(raw == null ? '' : raw).trim();
+        if (!t) return {};
+        // <parameter=name>value</parameter> 形式
+        if (/<parameter=/i.test(t)) {
+            var out = {}, re = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/gi, m;
+            while ((m = re.exec(t))) out[m[1].trim()] = m[2];
+            return out;
+        }
+        if (t.charAt(0) === '{') {
+            try { return JSON.parse(t) || {}; } catch (e) { }
+            var fixed = repairJson(t);
+            if (fixed) return fixed;
+        }
+        // key = value 行式
+        var kv = {};
+        String(t).split(/\n/).forEach(function (line) {
+            var i = line.indexOf('=');
+            if (i > 0) kv[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+        });
+        return Object.keys(kv).length ? kv : {};
+    }
+
+    function parseTextToolCalls(text) {
+        var s = String(text == null ? '' : text);
+        var calls = [];
+        if (!s) return { clean: '', calls: calls };
+        var m;
+        TOOL_CALL_RE.lastIndex = 0;
+        while ((m = TOOL_CALL_RE.exec(s))) {
+            var inner = m[1] || '';
+            var f, found = false;
+            FN_RE.lastIndex = 0;
+            while ((f = FN_RE.exec(inner))) {
+                calls.push({ name: f[1], args: parseToolArgs(f[2]), id: 'text_' + calls.length });
+                found = true;
+            }
+            if (!found) {
+                // 外层有 tool_call 但没有 function 标签：尝试整体按「名字 + JSON」解析
+                var bare = inner.trim();
+                var bm = /^([A-Za-z_][A-Za-z0-9_]*)\s*(\{[\s\S]*\})?\s*$/.exec(bare);
+                if (bm) calls.push({ name: bm[1], args: parseToolArgs(bm[2] || ''), id: 'text_' + calls.length });
+            }
+        }
+        if (!calls.length) {
+            // 兜底：只有 <function=...> 没有 <tool_call> 包裹
+            var f2; FN_LOOSE_RE.lastIndex = 0;
+            while ((f2 = FN_LOOSE_RE.exec(s))) {
+                calls.push({ name: f2[1], args: parseToolArgs(f2[2]), id: 'text_' + calls.length });
+            }
+        }
+        return { clean: stripToolCallText(s), calls: calls };
+    }
+
+    // 给支持原生 function calling 的模型：只需一句提醒，说明图片要走工具
+    function toolHintPrompt() {
+        return [
+            '',
+            '【补充能力】',
+            '- 联网检索：已自动为你附带实时资料，需要时可引用。',
+            '- 生图：用户要图片时调用 generate_image 工具拿到真实地址，'
+            + '把返回的 Markdown 图片放进回复；**严禁自己编造图片链接**。**用Markdown格式输出！**'
+        ].join('\n');
+    }
+
+    // 给不支持原生 FC 的引擎用的工具说明书：直接由 TOOLS 生成，永不手写、不会和代码脱节
+    function toolProtocolPrompt() {
+        var lines = TOOLS.map(function (t) {
+            var fn = t.function || {};
+            var ps = (fn.parameters && fn.parameters.properties) || {};
+            var req = (fn.parameters && fn.parameters.required) || [];
+            var keys = Object.keys(ps).map(function (k) {
+                return k + (req.indexOf(k) >= 0 ? '*' : '') + ':' + ((ps[k] && ps[k].type) || 'string');
+            }).join(', ');
+            return '- ' + fn.name + '(' + (keys || '') + ') — ' + String(fn.description || '').split('\n')[0];
+        });
+        return [
+            '',
+            '【工具调用方式 · 本引擎不支持原生 function calling，必须按以下文本协议调用】',
+            '需要操作文件 / 站点时，严格输出如下块（可连续多个，每次回复只输出你确定要执行的）：',
+            '<tool_call>',
+            '<function=工具名>',
+            '{"参数名":"值"}',
+            '</function>',
+            '</tool_call>',
+            '约束：',
+            '1. 参数必须是一个合法 JSON 对象；无参数时写 {}。',
+            '2. 不要在同一条回复里既输出工具块又输出最终结论 —— 先调工具，拿到结果后再回答。',
+            '3. 一次只调用真正需要的工具，禁止编造下面列表里没有的工具名。',
+            '4. 工具结果会以「【工具返回】<工具名> ...」的形式回传给你，据此继续。',
+            '5. 不需要工具时，正常用自然语言回答，不要输出任何 tool_call 标签。',
+            '',
+            '可用工具（* 表示必填）：',
+            lines.join('\n')
+        ].join('\n');
+    }
+
     var TOOLS = [
         {
             type: 'function',
@@ -1235,6 +1322,23 @@
                 description: '读取全站统计数据：站点总数与总访问量（无需登录）',
                 parameters: { type: 'object', properties: {}, required: [] }
             }
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'generate_image',
+                description: '根据文字描述生成一张图片。用户说「画/生成/来一张…图片」「配图」「插图」'
+                    + '等需求时调用它；纯网页、代码、文字类需求不要用。'
+                    + '调用后会返回图片地址，你必须把它以 Markdown 图片形式放进回复里展示给用户。',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        prompt: { type: 'string', description: '画面的英文或中文描述，越具体越好（主体、风格、构图、光线）' },
+                        size: { type: 'string', description: '画幅，可选：1024x1024（默认）、1024x1536 竖版、1536x1024 横版' }
+                    },
+                    required: ['prompt']
+                }
+            }
         }
     ];
     function clip(s) {
@@ -1380,6 +1484,13 @@
                 case 'get_announcement': {
                     var an = await dashGet('/api/announcement');
                     return ok(an.announcement ? ('公告（' + String(an.created_at || '').slice(0, 10) + '）：\n' + an.announcement) : '当前没有平台公告');
+                }
+                case 'generate_image': {
+                    var img = await sendImage(args.prompt, args.size);
+                    // 返回 Markdown，模型直接把它放进回复就能渲染出图
+                    return ok('图片已生成，请把下面这行原样放进你的回复中展示给用户：\n'
+                        + '![' + String(args.prompt || '生成结果').replace(/[\n\]]/g, ' ').slice(0, 50) + '](' + img.url + ')'
+                        + '\n\n（模型：' + (img.model || '') + ' ｜ 尺寸：' + (img.size || '1024x1024') + '）');
                 }
                 case 'get_platform_stats': {
                     var stt = await dashGet('/api/stats');
@@ -1624,13 +1735,19 @@
         if (!el) return;
         var ph = el.querySelector('[data-thinking]');
         if (ph) ph.remove();
-        safeRender(el, renderMarkdown(text || ''));
+        // 流式过程中就把 <tool_call> 及其未闭合的前半段藏掉，
+        // 否则用户会看到一串原始标签先闪一遍再消失。
+        var shown = text;
+        try { if (typeof isAgnes === 'function' && isAgnes()) shown = stripToolCallText(text || ''); } catch (e) { }
+        safeRender(el, renderMarkdown(shown || ''));
         scrollMsgsToEnd();
     }
     function endStreamMsg(el, text) {
         if (!el) return;
         el.classList.remove('cop-streaming');
-        safeRender(el, renderMarkdown(text || ''));
+        var shown2 = text;
+        try { if (typeof isAgnes === 'function' && isAgnes()) shown2 = stripToolCallText(text || ''); } catch (e) { }
+        safeRender(el, renderMarkdown(shown2 || ''));
         var turn = el.parentNode && el.parentNode.parentNode;
         if (turn && turn.classList) turn.classList.remove('cop-streaming');
         scrollMsgsToEnd();
@@ -1822,11 +1939,11 @@
     }
     /* ===== 生图（Agnes 专用模式）=====
        走后端代理 /api/ai/image，Key 不落前端。 */
-    async function sendImage(prompt) {
+    async function sendImage(prompt, size) {
         var res = await copFetch((window.API_URL || 'https://page.goose.cc.cd') + '/api/ai/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt, size: '1024x1024' })
+            body: JSON.stringify({ prompt: prompt, size: size || '1024x1024' })
         }, 120000);
         var data = null;
         try { data = await res.json(); } catch (e) { }
@@ -1839,37 +1956,14 @@
         if (busy) return;
         if (!text || !text.trim()) return;
 
-        // 生图模式：不进对话循环，直接调生图并在流里渲染图片
-        if (hasCap('image') && engineOpts.mode === 'image') {
-            busy = true; aborted = false;
-            setBusy(true);
-            pushMsg('user', text);
-            try {
-                var streamEl = beginStreamMsg();
-                updateStreamMsg(streamEl, '正在生成图片…');
-                var out = await sendImage(text);
-                var md = '![生成结果](' + out.url + ')\n\n'
-                    + '> 模型：' + (out.model || currentEngine.label)
-                    + ' ｜ 尺寸：' + (out.size || '1024x1024');
-                endStreamMsg(streamEl, md);
-                history.push({ role: 'user', content: text });
-                history.push({ role: 'assistant', content: md });
-            } catch (e) {
-                var box = document.getElementById('copMsgs');
-                if (box && box.lastElementChild) removeStreamMsg(box.lastElementChild);
-                pushMsg('system', '生图失败：' + (e && e.message ? e.message : String(e)));
-            } finally {
-                busy = false; aborted = false;
-                setBusy(false);
-            }
-            return;
-        }
-
         busy = true; aborted = false;
         setBusy(true);
         pushMsg('user', text);
         history.push({ role: 'user', content: text });
-        var sysMsgs = [{ role: 'system', content: SYSTEM_PROMPT }];
+        // Agnes 不支持原生 function calling → 追加文本工具协议，否则它会把
+        // <tool_call> 当普通文字吐给我们，而前端根本不认识（既不执行也不隐藏）。
+        var sysText = isAgnes() ? (SYSTEM_PROMPT + '\n' + toolProtocolPrompt()) : (SYSTEM_PROMPT + '\n' + toolHintPrompt());
+        var sysMsgs = [{ role: 'system', content: sysText }];
         var digest = siteDigest();
         if (digest) sysMsgs.push({ role: 'system', content: digest });
         var messages = sysMsgs.concat(history);
@@ -1903,6 +1997,37 @@
                     else removeStreamMsg(streamEl);
                     break;
                 }
+                // 文本协议的工具调用（Agnes 等）：解析 → 执行 → 回喂
+                if (isAgnes() && msg && typeof msg.content === 'string' && msg.content.indexOf('<tool_call') >= 0) {
+                    var parsed = parseTextToolCalls(msg.content);
+                    if (parsed.calls.length) {
+                        toolCalls += parsed.calls.length;
+                        history.push({ role: 'assistant', content: parsed.clean || '' });
+                        if (parsed.clean) endStreamMsg(streamEl, parsed.clean);
+                        else removeStreamMsg(streamEl);
+                        for (var ti = 0; ti < parsed.calls.length; ti++) {
+                            if (aborted) break;
+                            var call = parsed.calls[ti];
+                            var tnode = null, tstop = null, tout;
+                            try {
+                                tnode = pushTool(call.name, call.args);
+                                tstop = startToolTimer(tnode);
+                            } catch (uiErr) { }
+                            try {
+                                tout = await execTool(call.name, call.args);
+                            } catch (te) {
+                                tout = 'ERROR: ' + (te && te.message ? te.message : String(te));
+                            } finally {
+                                if (tstop) tstop();
+                            }
+                            if (tnode) finishTool(tnode, tout);
+                            messages.push({ role: 'user', content: '【工具返回】' + call.name + '\n' + tout });
+                            history.push({ role: 'tool', name: call.name, content: tout });
+                        }
+                        continue;
+                    }
+                    msg.content = parsed.clean;   // 只剩标签垃圾，清掉再展示
+                }
                 messages.push(msg);
                 if (msg.tool_calls && msg.tool_calls.length) {
                     toolCalls += msg.tool_calls.length;
@@ -1932,8 +2057,11 @@
                 history.push({ role: 'assistant', content: msg.content || '' });
                 endStreamMsg(streamEl, msg.content || '（无输出）');
                 if (toolCalls === 0 && looksLikeBuildRequest(text)) {
-                    pushMsg('system', '未调用文件工具：模型「' + (currentModel || '当前')
-                        + '」不支持 function calling');
+                    // Agnes 走的是文本工具协议，没有原生 FC，这条提示对它不适用，
+                    // 换成可操作的引导，而不是甩一句「不支持」。
+                    pushMsg('system', isAgnes()
+                        ? '没有执行任何工具：请更明确地说出要做的事，或切换到「GooseHost Copilot」（原生工具调用，建站更稳）。'
+                        : '未调用文件工具：模型「' + (currentModel || '当前') + '」不支持 function calling');
                 }
                 return;
             }

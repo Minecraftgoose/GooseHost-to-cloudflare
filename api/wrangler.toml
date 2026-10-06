@@ -3,6 +3,10 @@ main = "worker.js"
 compatibility_date = "2026-07-27"
 
 [vars]
+# 深度思考：默认对所有模型开启（注入 thinking / reasoning_effort）。
+# 若上游报 400 unknown parameter，把这里改成 "off" 即可全局降级，无需改代码。
+AI_THINKING = "on"
+
 API_URL = "https://page.goose.cc.cd"
 ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955"
 
