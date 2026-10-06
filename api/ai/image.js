@@ -5,7 +5,6 @@
 // 与 /api/ai/chat 一样受「账号级」限制：只允许登录会话。
 
 import { getUserId, isApiKeyRequest } from '../utils/jwt.js';
-import { checkRateLimit } from '../utils/rate-limit.js';
 import { jsonResp } from '../utils/response.js';
 
 const AGNES_BASE = 'https://api.agnes-ai.cn/v1';
@@ -26,14 +25,7 @@ export async function handleAiImage(request, env, corsHeaders) {
   const userId = await getUserId(request, env);
   if (!userId) return jsonResp({ error: 'Unauthorized' }, 401, corsHeaders);
 
-  const rl = await checkRateLimit(request, env, 'ai_image');
-  if (!rl.allowed) {
-    return jsonResp({
-      error: `请求过于频繁，请在 ${Math.ceil(rl.resetIn)} 秒后重试`,
-      retryAfter: Math.ceil(rl.resetIn)
-    }, 429, corsHeaders);
-  }
-
+  // AI 链路不做限流（与 chat 保持一致）：成本由模型侧额度兜底。
   const keys = String(env.AGNES_API_KEYS || env.AGNES_API_KEY || '')
     .split(',').map(s => s.trim()).filter(Boolean);
   if (!keys.length) {

@@ -25,7 +25,6 @@
     ];
     var ENGINE_KEY = 'cop_engine_v1';
     var currentEngine = ENGINES[0];
-    var searchHintShown = false;   // 「未配置联网检索」提示只弹一次，避免刷屏
 
     function loadEnginePref() {
         try {
@@ -1014,7 +1013,9 @@
         return [
             '',
             '【补充能力】',
-            '- 联网检索：已自动为你附带实时资料，需要时可引用。',
+            '- 联网检索：遇到新闻、时效事件、实时数据等你不确定的信息时，'
+            + '调用 web_search 工具拿真实结果，并用 [编号](链接) 标注来源；'
+            + '**严禁凭记忆编造时事**。**用Markdown格式输出！**',
             '- 生图：用户要图片时调用 generate_image 工具拿到真实地址，'
             + '把返回的 Markdown 图片放进回复；**严禁自己编造图片链接**。**用Markdown格式输出！**'
         ].join('\n');
@@ -1045,7 +1046,8 @@
             '2. 不要在同一条回复里既输出工具块又输出最终结论 —— 先调工具，拿到结果后再回答。',
             '3. 一次只调用真正需要的工具，禁止编造下面列表里没有的工具名。',
             '4. 工具结果会以「【工具返回】<工具名> ...」的形式回传给你，据此继续。',
-            '5. 不需要工具时，正常用自然语言回答，不要输出任何 tool_call 标签。',
+            '5. 需要最新信息时主动调用 web_search，不要说「我无法搜索」——你能搜。',
+            '6. 不需要工具时，正常用自然语言回答，不要输出任何 tool_call 标签。',
             '',
             '可用工具（* 表示必填）：',
             lines.join('\n')
@@ -1308,6 +1310,22 @@
         {
             type: 'function',
             function: {
+                name: 'web_search',
+                description: '联网检索实时信息。当用户问到新闻、时效事件、实时数据、'
+                    + '你不确定的最新事实时调用它；纯代码/网页/创作类问题不要调用。'
+                    + '返回结果含标题、链接与摘要，回答时要用 [编号](链接) 标注来源。',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        query: { type: 'string', description: '检索关键词，中文或英文均可，越具体越好' }
+                    },
+                    required: ['query']
+                }
+            }
+        },
+        {
+            type: 'function',
+            function: {
                 name: 'get_platform_stats',
                 description: '读取全站统计数据：站点总数与总访问量（无需登录）',
                 parameters: { type: 'object', properties: {}, required: [] }
@@ -1481,6 +1499,15 @@
                     return ok('图片已生成，请把下面这行原样放进你的回复中展示给用户：\n'
                         + '![' + String(args.prompt || '生成结果').replace(/[\n\]]/g, ' ').slice(0, 50) + '](' + img.url + ')'
                         + '\n\n（模型：' + (img.model || '') + ' ｜ 尺寸：' + (img.size || '1024x1024') + '）');
+                }
+                case 'web_search': {
+                    var sr = await webSearch(args.query);
+                    if (!sr.ok) return 'ERROR: ' + sr.error;
+                    var lines = sr.results.map(function (h, i) {
+                        return '[' + (i + 1) + '] ' + h.title + '\n' + h.url + '\n' + h.content;
+                    });
+                    return ok('检索到 ' + sr.results.length + ' 条结果（耗时 ' + sr.elapsedMs + 'ms），'
+                        + '请基于它们回答并用 [编号](链接) 标注来源：\n\n' + lines.join('\n\n'));
                 }
                 case 'get_platform_stats': {
                     var stt = await dashGet('/api/stats');
@@ -1908,15 +1935,6 @@
         }
         var used = res.headers.get('X-Copilot-Model');
         if (used && cb.onModel) cb.onModel(used);
-        // 联网检索状态：未配置 Key 时明确告诉用户，
-        // 否则模型只会说「我无法搜索」，用户根本不知道是配置问题
-        var srch = res.headers.get('X-Copilot-Search');
-        if (srch === 'unconfigured' && !searchHintShown) {
-            searchHintShown = true;
-            pushMsg('system', '联网检索未生效：服务端还没配置 TAVILY_API_KEY，'
-                + '模型拿不到实时资料才会说「无法搜索」。'
-                + '在 Cloudflare Workers 环境变量里配置后重新部署即可。');
-        }
         if (!res.ok) {
             var data = null;
             try { data = await res.json(); } catch (e) { }
@@ -1991,6 +2009,30 @@
     }
     /* ===== 生图（Agnes 专用模式）=====
        走后端代理 /api/ai/image，Key 不落前端。 */
+    /* ===== 联网检索（工具化）=====
+       以前是每次对话都由服务端先跑一遍检索再发给模型，等于给每轮白加 1～5 秒，
+       还会把 prompt 撑长、拖慢首 token。现在只在模型真的需要时才调。 */
+    async function webSearch(query) {
+        var q = String(query == null ? '' : query).trim();
+        if (!q) return { ok: false, error: 'query 不能为空' };
+        try {
+            var res = await copFetch(chatEndpoint().replace(/\/api\/ai\/chat$/, '/api/ai/search'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: q })
+            }, 20000);
+            var data = null;
+            try { data = await res.json(); } catch (e) { }
+            if (!res.ok || !data) {
+                return { ok: false, error: (data && data.error) || ('检索失败（HTTP ' + res.status + '）') };
+            }
+            if (!data.ok) return { ok: false, error: data.error || '检索失败' };
+            return { ok: true, results: data.results || [], elapsedMs: data.elapsedMs || 0 };
+        } catch (e) {
+            return { ok: false, error: (e && e.message) ? e.message : String(e) };
+        }
+    }
+
     async function sendImage(prompt, size) {
         var res = await copFetch((window.API_URL || 'https://page.goose.cc.cd') + '/api/ai/image', {
             method: 'POST',

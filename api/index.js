@@ -46,6 +46,7 @@ import { handleDebugSyncEmails, handleDebugTestAuth } from './debug.js';
 
 import { handleAiChat } from './ai/chat.js';
 import { handleAiImage } from './ai/image.js';
+import { handleAiSearch } from './ai/search.js';
 
 import {
   handlePlayListPosts,
@@ -202,6 +203,11 @@ export default {
     // POST /api/ai/chat - AI Copilot 转发（认证与限流在 handler 内）
     if (url.pathname === '/api/ai/chat' && method === 'POST') {
       return await handleAiChat(request, env, corsHeaders);
+    }
+
+    // POST /api/ai/search - 联网检索（供 Copilot 的 web_search 工具调用）
+    if (url.pathname === '/api/ai/search' && method === 'POST') {
+      return await handleAiSearch(request, env, corsHeaders);
     }
 
     // POST /api/ai/image - AI 生图转发（认证与限流在 handler 内）

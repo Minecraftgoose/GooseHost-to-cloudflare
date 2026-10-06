@@ -1,5 +1,4 @@
 import { getUserId } from '../utils/jwt.js';
-import { checkRateLimit } from '../utils/rate-limit.js';
 import { jsonResp } from '../utils/response.js';
 const DEFAULT_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 const DEFAULT_MODELS = ['glm-4.7-flash', 'glm-4.6', 'glm-4-flash'];
@@ -129,16 +128,6 @@ function keyChainFor(provider, env) {
   }
   return keyChain(env);
 }
-/**
- * 是否做联网检索注入。
- * 统一默认开启：不管选哪个模型，都能拿到实时资料，
- * 用户不需要也不应该去勾开关（前端已移除该选项）。
- * 只有 provider 显式声明 serverSearch === false 才跳过。
- */
-function supportsSearch(provider) {
-  if (provider && provider.serverSearch === false) return false;
-  return true;
-}
 /** provider 对应的默认模型链 */
 function modelChainFor(provider, env) {
   if (provider) {
@@ -147,53 +136,6 @@ function modelChainFor(provider, env) {
     if (!(raw && provider === resolveProvider(env))) return provider.models.slice();
   }
   return modelChain(env);
-}
-/**
- * 联网搜索（Tavily）。由服务端注入检索结果，再交给模型总结。
- * 比让模型自己 tool_call 更稳：不依赖模型是否支持 function calling，
- * 也不会出现「模型编造搜索结果」的情况。
- */
-async function tavilySearch(query, env) {
-  const key = String(env.TAVILY_API_KEY || '').trim();
-  // 以前未配置 / 失败都静默返回 null，结果模型直接回「我无法搜索」，
-  // 而用户根本不知道是没配 Key。这里区分状态，交由响应头上报。
-  if (!key) return { state: 'unconfigured', hits: null };
-  try {
-    const r = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: key,
-        query: String(query).slice(0, 500),
-        max_results: 5,
-        search_depth: 'basic'
-      }),
-      signal: AbortSignal.timeout(15000)
-    });
-    if (!r.ok) return { state: 'error', hits: null };
-    const d = await r.json();
-    const list = Array.isArray(d && d.results) ? d.results : [];
-    if (!list.length) return { state: 'empty', hits: null };
-    return { state: 'ok', hits: list.slice(0, 5).map(x => ({
-      title: x.title || '',
-      url: x.url || '',
-      content: String(x.content || '').slice(0, 800)
-    })) };
-  } catch { return { state: 'error', hits: null }; }
-}
-function injectSearchContext(messages, hits) {
-  const brief = hits.map((h, i) =>
-    `[${i + 1}] ${h.title}\n${h.url}\n${h.content}`).join('\n\n');
-  const sys = {
-    role: 'system',
-    content: '以下是联网检索到的实时资料（含标题、链接与摘要）。请基于它们回答，'
-      + '并在句末用 [编号](链接) 标注来源。资料不足以回答时如实说明，不要编造。\n\n' + brief
-  };
-  const arr = messages.slice();
-  const firstNonSystem = arr.findIndex(m => m && m.role !== 'system');
-  if (firstNonSystem < 0) arr.push(sys);
-  else arr.splice(firstNonSystem, 0, sys);
-  return arr;
 }
 function modelChain(env) {
   const provider = resolveProvider(env);
@@ -240,7 +182,7 @@ function buildBody(model, payload, env, stream, providerOverride) {
   }
   return body;
 }
-function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, searchUsed, searchState) {
+function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs) {
   const h = {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -249,10 +191,6 @@ function sseHeaders(corsHeaders, model, keyIdx, keyCount, errors, elapsedMs, sea
     ...corsHeaders,
     'X-Copilot-Model': model
   };
-  // 让前端/运维能看出这次到底有没有检索到实时资料（排查用）
-  // 1=检索到资料 0=检索了但没结果 unconfigured=未配置 Key（此时模型当然答不了时效问题）
-  if (searchUsed) h['X-Copilot-Search'] = '1';
-  else if (searchState) h['X-Copilot-Search'] = searchState === 'ok' ? '0' : searchState;
   if (typeof elapsedMs === 'number') h['X-Copilot-Elapsed'] = String(elapsedMs);
   if (keyCount > 1) h['X-Copilot-Key'] = `${keyIdx}/${keyCount}`;
   if (errors.length) h['X-Copilot-Fallback'] = errors.join(' | ');
@@ -308,13 +246,7 @@ function parseRetryAfter(resp) {
 export async function handleAiChat(request, env, corsHeaders) {
   const userId = await getUserId(request, env);
   if (!userId) return jsonResp({ error: 'Unauthorized' }, 401, corsHeaders);
-  const rl = await checkRateLimit(request, env, 'ai_chat');
-  if (!rl.allowed) {
-    const msg = rl.locked
-      ? `操作过于频繁，请在 ${Math.ceil(rl.resetIn / 60)} 分钟后重试`
-      : `请求过于频繁，请在 ${Math.ceil(rl.resetIn)} 秒后重试`;
-    return jsonResp({ error: msg, retryAfter: Math.ceil(rl.resetIn) }, 429, corsHeaders);
-  }
+  // AI 链路不做限流：交互型请求被限流会直接毁掉体验，成本由模型侧的额度兜底。
   const errors = [];                       // 函数级作用域：tryModelOnce 闭包与汇总返回都会 push
   let payload;
   try { payload = await request.json(); } catch {
@@ -340,23 +272,6 @@ export async function handleAiChat(request, env, corsHeaders) {
     }, 500, corsHeaders);
   }
 
-  // ---- 联网搜索：默认开启，服务端检索后注入上下文 ----
-  // 用户不再需要手动开开关：换任何模型都能拿到实时资料。
-  // 仅在显式传 search === false 时跳过（保留一个应急关闭口）。
-  let searchUsed = false;
-  let searchState = 'unknown';   // ok / empty / error / unconfigured
-  if (payload.search !== false && supportsSearch(activeProvider)) {
-    const lastUser = [...payload.messages].reverse().find(m => m && m.role === 'user');
-    const q = lastUser ? String(lastUser.content || '').slice(0, 500) : '';
-    if (q) {
-      const sr = await tavilySearch(q, env);
-      searchState = (sr && sr.state) || 'error';
-      if (sr && sr.hits && sr.hits.length) {
-        payload.messages = injectSearchContext(payload.messages, sr.hits);
-        searchUsed = true;
-      }
-    }
-  }
   const models = modelChainFor(activeProvider, env);
   // OpenCode Zen：本代理只会发 Chat Completions 格式的请求体，
   // 但 Zen 的 GPT / Grok / Claude / Qwen / Gemini / Jev 走的是别的 endpoint 和别的协议。
@@ -494,7 +409,7 @@ export async function handleAiChat(request, env, corsHeaders) {
           });
           return new Response(guarded, {
             status: 200,
-            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed, searchUsed, searchState)
+            headers: sseHeaders(corsHeaders, model, r.keyIdx, keyList.length, errors, elapsed)
           });
         }
         const headers = {
@@ -505,8 +420,6 @@ export async function handleAiChat(request, env, corsHeaders) {
         };
         if (keyList.length > 1) headers['X-Copilot-Key'] = `${r.keyIdx}/${keyList.length}`;
         if (errors.length) headers['X-Copilot-Fallback'] = errors.join(' | ');
-        if (searchUsed) headers['X-Copilot-Search'] = '1';
-        else if (searchState) headers['X-Copilot-Search'] = searchState === 'ok' ? '0' : searchState;
         return new Response(r.text, { status: r.status, headers });
       }
       if (r.fatalModel) break;
