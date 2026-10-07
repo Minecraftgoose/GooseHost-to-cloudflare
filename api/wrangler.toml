@@ -13,7 +13,7 @@ CORS_ALLOW_ALL = "on"
 CORS_EXTRA_ORIGINS = ""
 
 API_URL = "https://page.goose.cc.cd"
-ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955"
+ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955,91e8157c-63e7-4dd7-ada9-0e3749d3c789"
 
 AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 AI_MODEL = "glm-4.7-flash,glm-4.6,glm-4-flash"
