@@ -1,5 +1,3 @@
-// ===== macOS 开发者计划 =====
-
 import { getUserId } from './utils/jwt.js';
 import { jsonResp } from './utils/response.js';
 import { makeSupabase } from './utils/supabase.js';
