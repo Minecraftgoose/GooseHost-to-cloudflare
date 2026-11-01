@@ -61,7 +61,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://host.goose.cc.cd/status</loc>
+    <loc>https://status.goose.cc.cd/</loc>
     <lastmod>2026-07-17</lastmod>
     <changefreq>hourly</changefreq>  
     <priority>0.7</priority>

@@ -23,7 +23,6 @@ if (typeof getSvgPath === 'function') {
             override: { '.cop-right-panel': [14, 14, 14, 14], '.sidebar': [0, 16, 16, 0] }
         },
         { path: /^\/admin(?:\/|$)/, sel: '.section, .stat-card, .modal' },
-        { path: /^\/status(?:\/|$)/, sel: '.service-card' },
         { path: /^\/playground(?:\/|$)/, sel: '.pg-card, .pg-post, .pg-detail, .pg-modal-box' },
         { path: /^\/login(?:\/|$)/, sel: '.modal-overlay .card, .notice-card' }
     ];

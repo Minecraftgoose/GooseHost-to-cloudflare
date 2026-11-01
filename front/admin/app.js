@@ -1162,74 +1162,8 @@
             } catch (err) { showToast(err.message, 'error'); }
         }
 
-        // System Status 
-        const SERVICE_KEYS = ['login', 'register', 'create', 'my-sites', 'update', 'delete', 'serve-html', 'serve-md'];
-
-        async function loadSystemStatus() {
-            const token = checkAuth();
-            if (!token) return;
-            try {
-                const res = await apiFetch(`${API_URL}/api/admin/system-status`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '加载失败');
-                document.getElementById('maintenanceMode').checked = data.maintenance_mode || false;
-                document.getElementById('maintenanceMsg').value = data.maintenance_message || '';
-                const services = data.services || {};
-                SERVICE_KEYS.forEach(key => {
-                    const el = document.getElementById('svc-' + key);
-                    if (el) el.checked = services[key] !== false;
-                });
-                const allOn = SERVICE_KEYS.every(key => services[key] !== false);
-                document.getElementById('globalStatus').checked = allOn;
-            } catch (err) {
-                showToast('加载系统状态失败: ' + err.message);
-            }
-        }
-
-        function toggleAllServices() {
-            const globalOn = document.getElementById('globalStatus').checked;
-            SERVICE_KEYS.forEach(key => {
-                const el = document.getElementById('svc-' + key);
-                if (el) el.checked = globalOn;
-            });
-            setTimeout(() => saveSystemStatus(), 0);
-        }
-
-        async function saveSystemStatus() {
-            const token = checkAuth();
-            if (!token) return;
-            const maintenance_mode = document.getElementById('maintenanceMode').checked;
-            const maintenance_message = document.getElementById('maintenanceMsg').value.trim();
-            const services = {};
-            let allOn = true, allOff = true;
-            SERVICE_KEYS.forEach(key => {
-                const el = document.getElementById('svc-' + key);
-                const isOn = el ? el.checked : true;
-                services[key] = isOn;
-                if (isOn) allOff = false;
-                else allOn = false;
-            });
-            const globalEl = document.getElementById('globalStatus');
-            if (allOn) globalEl.checked = true;
-            else if (allOff) globalEl.checked = false;
-            try {
-                const res = await apiFetch(`${API_URL}/api/admin/system-status`, {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ maintenance_mode, maintenance_message, services })
-                });
-                const data = await res.json();
-                if (res.ok) showToast('系统状态已保存', 'success');
-                else showToast(data.error || '保存失败', 'error');
-            } catch (err) {
-                showToast('保存失败: ' + err.message);
-            }
-        }
-
-
         document.getElementById('searchWrap').style.display = 'flex';
         loadData();
-        loadSystemStatus();
         loadAnnouncement();
 
         // ===== 公告 =====

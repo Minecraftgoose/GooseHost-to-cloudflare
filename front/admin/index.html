@@ -21,7 +21,7 @@
             <a href="/dashboard" class="header-link">
                 <i class="fas fa-arrow-left"></i> 返回面板
             </a>
-            <a href="../status" class="header-link">
+            <a href="https://status.goose.cc.cd/" class="header-link" target="_blank" rel="noopener">
                 <i class="fas fa-server"></i> 系统状态
             </a>
         </nav>
@@ -91,76 +91,9 @@
                 </div>
             </div>
             <div style="margin-top: 1rem;">
-                <textarea id="announcementContent" placeholder="输入公告内容，发布后所有用户 dashboard 顶部横幅显示（≤500 字符）" style="width: 100%; min-height: 80px; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius:6px; color: var(--color-fg); resize: vertical;"></textarea>
+                <!-- 全局公告：单行输入即可，一行就够，不需要多行文本域 -->
+                <input type="text" id="announcementContent" maxlength="500" placeholder="输入公告内容，发布后所有用户 dashboard 顶部横幅显示（≤500 字符）" style="width: 100%; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius:6px; color: var(--color-fg);">
                 <div style="margin-top: 0.5rem; font-size: 12px; color: rgba(255,255,255,0.4);">当前生效公告：<span id="currentAnnouncement" style="color: rgba(255,255,255,0.7);">—</span></div>
-            </div>
-        </div>
-
-        <!-- System Status -->
-        <div class="section">
-            <div class="section-header">
-                <div class="section-title">
-                    <i class="fas fa-server"></i>
-                    <span>系统状态控制</span>
-                </div>
-                <div class="section-actions">
-                    <button class="btn btn-primary" onclick="saveSystemStatus()">
-                        <i class="fas fa-save"></i> 保存设置
-                    </button>
-                </div>
-            </div>
-            <div style="margin-top: 1rem;">
-                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 1rem; background: var(--color-bg); border-radius:6px;">
-                        <input type="checkbox" id="maintenanceMode" onchange="saveSystemStatus()">
-                        <span><i class="fas fa-tools"></i> 维护模式</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 1rem; background: var(--color-bg); border-radius:6px;">
-                        <input type="checkbox" id="globalStatus" onchange="toggleAllServices()">
-                        <span><i class="fas fa-globe"></i> 总开关</span>
-                    </label>
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <input type="text" id="maintenanceMsg" placeholder="维护公告（可选）" style="width: 100%; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius:6px; color: var(--color-fg);">
-                </div>
-                <div style="font-size: 0.85rem; color: var(--color-fg-muted); margin-bottom: 0.75rem;"><i class="fas fa-info-circle"></i> 填写公告文字后将在状态页显示，不受维护模式开关影响</div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-sign-in-alt"></i> 登录</span>
-                        <input type="checkbox" id="svc-login" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-user-plus"></i> 注册</span>
-                        <input type="checkbox" id="svc-register" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-plus"></i> 创建网站</span>
-                        <input type="checkbox" id="svc-create" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-list"></i> 网站列表</span>
-                        <input type="checkbox" id="svc-my-sites" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-edit"></i> 更新网站</span>
-                        <input type="checkbox" id="svc-update" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-trash"></i> 删除网站</span>
-                        <input type="checkbox" id="svc-delete" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-globe-americas"></i> HTML访问</span>
-                        <input type="checkbox" id="svc-serve-html" checked onchange="saveSystemStatus()">
-                    </div>
-                    <div style="padding: 0.75rem; background: var(--color-bg); border-radius: 6px; border: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;"><i class="fas fa-file-alt"></i> MD访问</span>
-                        <input type="checkbox" id="svc-serve-md" checked onchange="saveSystemStatus()">
-                    </div>
-                </div>
-                <style>
-                    input[type="checkbox"] { width: 18px; height: 18px; accent-color: #02ff8e; cursor: pointer; }
-                </style>
             </div>
         </div>
 

@@ -30,7 +30,6 @@ import { handleAdminSites } from './admin/sites.js';
 import { handleAdminSiteDetail, handleAdminSiteUpdate } from './admin/site-detail.js';
 import { handleAdminDeleteUser, handleAdminDeleteSite } from './admin/delete-user.js';
 import { handleAdminSyncEmails } from './admin/sync-emails.js';
-import { handleGetSystemStatus, handleSetSystemStatus } from './admin/system-status.js';
 import { handleGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
 import { handlePublicStats } from './admin/public-stats.js';
 import {
@@ -301,16 +300,6 @@ export default {
     // POST /api/admin/sync-emails - 同步邮箱
     if (url.pathname === '/api/admin/sync-emails' && method === 'POST') {
       return await handleAdminSyncEmails(request, env, corsHeaders);
-    }
-
-    // GET /api/admin/system-status - 获取系统状态
-    if (url.pathname === '/api/admin/system-status' && method === 'GET') {
-      return await handleGetSystemStatus(request, env, corsHeaders);
-    }
-
-    // POST /api/admin/system-status - 设置系统状态
-    if (url.pathname === '/api/admin/system-status' && method === 'POST') {
-      return await handleSetSystemStatus(request, env, corsHeaders);
     }
 
     // POST /api/admin/announcement - 发公告/清公告
