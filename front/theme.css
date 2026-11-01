@@ -4,11 +4,23 @@
  * 必须在各页面自身样式之后加载
  */
 
+/* ===== 全局文字色变量（内联样式统一引用，随主题自动反色） ===== */
+html[data-theme="light"] {
+    --gh-fg:   #14251c;              /* 主文字 */
+    --gh-fg-2: #41564b;              /* 次要文字 */
+    --gh-fg-3: #6b7f74;              /* 弱化文字 */
+}
+html[data-theme="dark"] {
+    --gh-fg:   rgba(255, 255, 255, 0.90);
+    --gh-fg-2: rgba(255, 255, 255, 0.70);
+    --gh-fg-3: rgba(255, 255, 255, 0.45);
+}
+
 /* ---------- 悬浮切换按钮 ---------- */
 .gh-theme-toggle {
     position: fixed;
-    top: 14px;
-    right: 14px;
+    right: 18px;
+    bottom: 18px;
     z-index: 9998;
     width: 38px;
     height: 38px;
@@ -172,7 +184,8 @@ html[data-theme="light"][data-page="dashboard"] .site-actions a {
     border-color: rgba(0, 0, 0, 0.14) !important;
 }
 html[data-theme="light"][data-page="dashboard"] .btn-secondary:hover { background: rgba(0, 0, 0, 0.1) !important; }
-html[data-theme="light"][data-page="dashboard"] .btn-primary { color: #ffffff !important; }
+/* dashboard 的 btn-primary 是亮绿渐变底，用深色文字才看得清（不能用白字） */
+html[data-theme="light"][data-page="dashboard"] .btn-primary { color: #042413 !important; }
 html[data-theme="light"][data-page="dashboard"] .btn-danger { background: rgba(207, 34, 46, 0.1) !important; color: #cf222e !important; border-color: rgba(207, 34, 46, 0.35) !important; }
 html[data-theme="light"][data-page="dashboard"] input,
 html[data-theme="light"][data-page="dashboard"] textarea,
@@ -352,3 +365,114 @@ html[data-theme="dark"][data-page="status"] .card {
 }
 html[data-theme="dark"][data-page="status"] .card h1 { color: #e6edf3 !important; }
 html[data-theme="dark"][data-page="status"] .card p { color: #9198a1 !important; }
+
+
+/* ===== 浅色模式白色文字反色（自动扫描生成） =====
+ * 扫描各页面 CSS 中的白色系 color 生成，避免浅色模式下白字看不见。
+ * 按原 alpha 分三档：>=0.85 主文字 / >=0.5 次要 / <0.5 弱化，保留视觉层次。
+ */
+
+/* ---- style.css ---- */
+html[data-theme="light"][data-page="home"] .hero-title { color: #14251c !important; }
+html[data-theme="light"][data-page="home"] .hero-sub { color: #14251c !important; }
+html[data-theme="light"][data-page="home"] .url-compare .url-old { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="home"] .hero-stat .lbl { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="home"] .section-head h2 { color: #14251c !important; }
+html[data-theme="light"][data-page="home"] .compare-card li { color: #41564b !important; }
+html[data-theme="light"][data-page="home"] .footer { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="home"] .footer a { color: #6b7f74 !important; }
+
+/* ---- dashboard/style.css ---- */
+html[data-theme="light"][data-page="dashboard"] .nav-item { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .nav-item:hover { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .page-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .page-desc { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .card-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .btn-secondary { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .form-label { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] input, html[data-theme="light"][data-page="dashboard"] textarea { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] input::placeholder, html[data-theme="light"][data-page="dashboard"] textarea::placeholder { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .input-wrap.floating label { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .file-drop-zone p { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .drop-hint { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .site-actions a { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .empty { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .setting-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .modal-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .modal-close { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .modal-close:hover { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .dialog-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .dialog-close { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .dialog-close:hover { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .toast { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .confirm-title { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .confirm-message { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .btn-danger-solid { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .quick-action { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-name { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-meta { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-files-title { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-file { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-file .file-size { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .detail-file .file-actions button { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .type-option i { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .type-option .type-name { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .type-option.selected .type-name { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .type-option .type-desc { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .deploy-step:hover { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .deploy-step { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .deploy-step span { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .deploy-step.active { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .form-hint { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .token-item-name { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .token-item-meta { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .token-item-meta code { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .form-input { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .announcement-bar { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .welcome-text { color: #14251c !important; }
+
+/* ---- dashboard/copilot.css ---- */
+html[data-theme="light"][data-page="dashboard"] .cop-model-title { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-item { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-name { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-seg-btn { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-sw { color: #41564b !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-sw i { color: #6b7f74 !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-stop-btn { color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-tool-timer.done { color: #6b7f74 !important; }
+
+/* ---- login/style.css ---- */
+html[data-theme="light"][data-page="login"] input { color: #14251c !important; }
+html[data-theme="light"][data-page="login"] input::placeholder { color: #6b7f74 !important; }
+
+/* ---- register/style.css ---- */
+html[data-theme="light"][data-page="register"] input { color: #14251c !important; }
+html[data-theme="light"][data-page="register"] input::placeholder { color: #6b7f74 !important; }
+
+/* ===== 浅色模式：压暗过亮的强调色（亮绿/亮橙/亮红在浅底上几乎看不见） ===== */
+
+/* 亮绿 --accent 系列：markdown 内容与页脚链接里的硬编码 #02ff8e */
+html[data-theme="light"] #md-content a,
+html[data-theme="light"] .legal-notice a,
+html[data-theme="light"] .link-row a,
+html[data-theme="light"] .login-hint a,
+html[data-theme="light"] .footer a { color: #00703a !important; }
+html[data-theme="light"] #md-content a:hover,
+html[data-theme="light"] .legal-notice a:hover { color: #005c2f !important; }
+
+/* 首页对比区标签：good=绿 / bad=红 */
+html[data-page="home"][data-theme="light"] .compare-card.good .cmp-tag { color: #00703a !important; }
+html[data-page="home"][data-theme="light"] .compare-card.bad .cmp-tag { color: #b3261e !important; }
+
+/* 公告徽章（橙黄） */
+html[data-theme="light"] .notice-badge { color: #8a5a00 !important; }
+html[data-theme="light"] .notice-badge i { color: #8a5a00 !important; }
+
+/* 错误提示（亮红） */
+html[data-theme="light"] .msg.error,
+html[data-theme="light"] .error-text { color: #b3261e !important; }
+
+/* 深色下过暗的弱化小字（FAQ 计数、页脚版权）适当提亮 */
+html[data-theme="dark"] .faq-header span { color: rgba(255, 255, 255, 0.42) !important; }
+html[data-theme="dark"] .footer .credit { color: rgba(255, 255, 255, 0.42) !important; }
+html[data-page="home"][data-theme="light"] .faq-header span { color: #6b7f74 !important; }

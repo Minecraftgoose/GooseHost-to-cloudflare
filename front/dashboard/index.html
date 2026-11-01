@@ -283,7 +283,7 @@
                         <!-- macOS 开发者计划 -->
                         <div class="form-group" style="margin-top: 1rem; padding:0.8rem 1rem; background:rgba(2,255,142,0.05); border:1px solid rgba(2,255,142,0.15); border-radius:8px;">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem;">
-                                <span style="color:rgba(255,255,255,0.8); font-size:0.85rem; font-weight:600;">加入 macOS 网页版 app 开发者计划</span>
+                                <span style="color:var(--gh-fg); font-size:0.85rem; font-weight:600;">加入 macOS 网页版 app 开发者计划</span>
                                 <label class="toggle" style="flex-shrink:0;">
                                     <input type="checkbox" id="macosSubmit" onchange="document.getElementById('macosFields').style.display = this.checked ? 'block' : 'none';">
                                     <span class="toggle-slider"></span>
@@ -303,7 +303,7 @@
                                     <input type="text" id="macosDesc" maxlength="200" placeholder="用一句话介绍你的网站" style="width:100%; padding:8px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(2,255,142,0.2); border-radius:6px; color:var(--color-fg, #eafff5); font-size:0.85rem;">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">分类 <span style="color:rgba(255,255,255,0.35); font-weight:normal;">（必填）</span></label>
+                                    <label class="form-label">分类 <span style="color:var(--gh-fg-3); font-weight:normal;">（必填）</span></label>
                                     <select id="macosCategory" style="width:100%; padding:8px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(2,255,142,0.2); border-radius:6px; color:var(--color-fg, #eafff5); font-size:0.85rem;">
                                         <option value="工具">工具</option>
                                         <option value="游戏">游戏</option>
@@ -462,7 +462,7 @@
                     <div class="card-header">
                         <div class="card-title">
                             <i class="fas fa-key"></i> API 密钥
-                            <span id="tokenCount" style="margin-left:0.5rem; font-size:0.72rem; color:rgba(255,255,255,0.35); font-weight:400;">0 / 20</span>
+                            <span id="tokenCount" style="margin-left:0.5rem; font-size:0.72rem; color:var(--gh-fg-3); font-weight:400;">0 / 20</span>
                         </div>
                         <button class="btn btn-sm" id="createTokenBtn" onclick="showCreateTokenModal()" style="border:1px solid var(--border-focus); background:transparent; color:var(--accent);">
                             <i class="fas fa-plus"></i> 新建密钥
@@ -546,7 +546,7 @@
                     <input type="text" id="tokenName" class="form-input" maxlength="40"
                            placeholder="例如：我的笔记本 CLI" autocomplete="off">
                 </div>
-                <div style="font-size: 0.78rem; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 0.3rem;">
+                <div style="font-size: 0.78rem; color: var(--gh-fg-3); display: flex; align-items: center; gap: 0.3rem;">
                     <i class="fas fa-info-circle"></i> 密钥长期有效，仅在此次创建后显示一次
                 </div>
             </div>
@@ -569,7 +569,7 @@
             <div class="modal-body">
                 <div style="padding: 0.6rem 0.75rem; border-radius: 8px; margin-bottom: 0.75rem;
                             background: rgba(2,255,142,0.08); border: 1px solid rgba(2,255,142,0.25);
-                            font-size: 0.8rem; color: rgba(255,255,255,0.7); display: flex; gap: 0.4rem;">
+                            font-size: 0.8rem; color: var(--gh-fg-2); display: flex; gap: 0.4rem;">
                     <i class="fas fa-exclamation-triangle" style="color:#02ff8e; margin-top:2px;"></i>
                     <span>关闭后<b style="color:#02ff8e;">无法再次查看</b>完整密钥，遗失请吊销后重建。</span>
                 </div>
@@ -585,10 +585,10 @@
                         <i class="fas fa-copy"></i> 复制
                     </button>
                 </div>
-                <div style="margin-top:0.9rem; font-size:0.78rem; color:rgba(255,255,255,0.45);">
+                <div style="margin-top:0.9rem; font-size:0.78rem; color:var(--gh-fg-3);">
                     使用方式：
                     <code style="display:block; margin-top:0.35rem; padding:0.5rem 0.65rem; border-radius:6px;
-                                 background:rgba(0,0,0,0.35); color:rgba(255,255,255,0.75); font-size:0.75rem;
+                                 background:rgba(0,0,0,0.35); color:var(--gh-fg-2); font-size:0.75rem;
                                  white-space:nowrap; overflow-x:auto; scrollbar-width:thin;">
                         Authorization: Bearer <span id="tokenPlainEcho" style="color:#02ff8e;"></span>
                     </code>
@@ -614,8 +614,8 @@
             <div class="modal-body modal-body--fill">
                 <input type="hidden" id="projFileSlug">
                 <input type="hidden" id="projFilePath">
-                <textarea id="projFileContent" placeholder="文件内容..." style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.6; padding: 12px; width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(2,255,142,0.2); border-radius: 6px; color: #fff; resize: vertical;"></textarea>
-                <div id="projFileHint" style="flex:none; margin-top: 0.5rem; font-size: 0.78rem; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 0.3rem;">
+                <textarea id="projFileContent" placeholder="文件内容..." style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.6; padding: 12px; width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(2,255,142,0.2); border-radius: 6px; color:var(--gh-fg); resize: vertical;"></textarea>
+                <div id="projFileHint" style="flex:none; margin-top: 0.5rem; font-size: 0.78rem; color: var(--gh-fg-3); display: flex; align-items: center; gap: 0.3rem;">
                     <i class="fas fa-info-circle"></i> 保存将覆盖原文件，单文件上限 200KB
                 </div>
             </div>

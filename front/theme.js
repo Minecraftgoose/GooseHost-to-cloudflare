@@ -75,10 +75,32 @@
     document.body.appendChild(btn);
   }
 
+  function avoidCollision() {
+    // 右下角可能已有别的悬浮件（如问卷浮标），叠在一起会互相挡住。
+    // 检测后把自己上移一格，避免遮挡。
+    var btn = document.getElementById('ghThemeToggle');
+    if (!btn) return;
+    var box = btn.getBoundingClientRect();
+    var clash = false;
+    Array.prototype.forEach.call(document.querySelectorAll('body *'), function (el) {
+      if (el === btn || btn.contains(el)) return;
+      var cs = getComputedStyle(el);
+      if (cs.position !== 'fixed' || cs.display === 'none' || +cs.opacity === 0) return;
+      var r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) return;
+      if (r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) return;
+      clash = true;
+    });
+    btn.style.bottom = clash ? '70px' : '';
+  }
+
   function init() {
     apply();
     buildButton();
     apply();
+    // 外部悬浮件加载较慢，延后再判一次
+    setTimeout(avoidCollision, 800);
+    setTimeout(avoidCollision, 2500);
 
     if (mql) {
       var onChange = function () { if (readMode() === 'system') apply(); };

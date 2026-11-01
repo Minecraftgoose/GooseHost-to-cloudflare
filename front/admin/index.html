@@ -95,7 +95,7 @@
             <div style="margin-top: 1rem;">
                 <!-- 全局公告：单行输入即可，一行就够，不需要多行文本域 -->
                 <input type="text" id="announcementContent" maxlength="500" placeholder="输入公告内容，发布后所有用户 dashboard 顶部横幅显示（≤500 字符）" style="width: 100%; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius:6px; color: var(--color-fg);">
-                <div style="margin-top: 0.5rem; font-size: 12px; color: rgba(255,255,255,0.4);">当前生效公告：<span id="currentAnnouncement" style="color: rgba(255,255,255,0.7);">—</span></div>
+                <div style="margin-top: 0.5rem; font-size: 12px; color: var(--gh-fg-3);">当前生效公告：<span id="currentAnnouncement" style="color: var(--gh-fg-2);">—</span></div>
             </div>
         </div>
 
@@ -183,7 +183,7 @@
                 <input type="hidden" id="projFileSlug">
                 <input type="hidden" id="projFilePath">
                 <textarea id="projFileContent" placeholder="文件内容..." style="min-height: 380px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.6; width: 100%; padding: 12px; background: rgba(0,0,0,0.35); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-fg); resize: vertical; box-sizing: border-box;"></textarea>
-                <div style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.4);">
+                <div style="margin-top: 8px; font-size: 12px; color: var(--gh-fg-3);">
                     <i class="fas fa-info-circle"></i> 保存将覆盖原文件，单文件上限 200KB
                 </div>
             </div>
@@ -239,7 +239,7 @@
             <div class="modal-body" style="text-align:center;">
                 <p style="margin-bottom: 8px;">确定删除网站</p>
                 <p id="deleteSiteNameDisplay" style="font-weight: 600; font-size: 16px; margin-bottom: 8px;"></p>
-                <div id="deleteStorageInfo" style="margin: 8px 0; text-align: left; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: rgba(255,255,255,0.6); max-height: 140px; overflow-y: auto;"></div>
+                <div id="deleteStorageInfo" style="margin: 8px 0; text-align: left; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--gh-fg-2); max-height: 140px; overflow-y: auto;"></div>
                 <p style="color: var(--color-danger-fg); font-size: 13px;">此操作不可恢复</p>
             </div>
             <div class="modal-footer">

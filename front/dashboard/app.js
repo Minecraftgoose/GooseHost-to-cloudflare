@@ -301,7 +301,7 @@
         async function loadTokens() {
             const box = document.getElementById('tokenList');
             if (!box) return;
-            box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,255,255,0.35); padding:0.5rem 0;">'
+            box.innerHTML = '<div style="font-size:0.8rem; color:var(--gh-fg-3); padding:0.5rem 0;">'
                 + '<i class="fas fa-spinner fa-spin"></i> 载入中...</div>';
             try {
                 const res = await apiFetch(API_URL + '/api/tokens');
@@ -318,7 +318,7 @@
                 if (btn) btn.disabled = list.length >= TOKEN_MAX;
 
                 if (!list.length) {
-                    box.innerHTML = '<div style="font-size:0.8rem; color:rgba(255,255,255,0.35); padding:0.5rem 0;">'
+                    box.innerHTML = '<div style="font-size:0.8rem; color:var(--gh-fg-3); padding:0.5rem 0;">'
                         + '还没有 API 密钥。创建一个即可在 CLI 或脚本中长期调用，无需反复登录。</div>';
                     return;
                 }
