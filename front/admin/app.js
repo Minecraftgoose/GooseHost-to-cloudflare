@@ -309,10 +309,10 @@
                 const siteUrl = API_URL + urlPrefix + encodeURIComponent(site.name);
 
                 const typeBadge = site.type === 'md'
-                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#f9a825;border:1px solid rgba(249,168,37,.4);margin-left:6px;vertical-align:1px;">MD</span>'
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:var(--gh-type-md);border:1px solid rgba(249,168,37,.4);margin-left:6px;vertical-align:1px;">MD</span>'
                     : site.type === 'project'
-                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;vertical-align:1px;">PROJECT</span>'
-                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;vertical-align:1px;">HTML</span>';
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:var(--gh-type-project);border:1px solid rgba(187,134,252,.4);margin-left:6px;vertical-align:1px;">PROJECT</span>'
+                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:var(--gh-type-html);border:1px solid rgba(3,218,198,.4);margin-left:6px;vertical-align:1px;">HTML</span>';
                 return `<tr onclick="openSiteDetailPage('${escJsAttr(site.name)}')" style="cursor:pointer;">
                     <td><a href="javascript:void(0)" onclick="event.stopPropagation();openSiteDetailPage('${escJsAttr(site.name)}')" class="site-name">${esc(site.name)}</a>${typeBadge}</td>
                     <td style="color:var(--color-fg-default);font-size:13px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(site.ownerEmail || site.owner_id || '—')}">${esc(site.ownerEmail || site.owner_id || '—')}</td>
@@ -528,7 +528,7 @@
                 const d = await res.json();
                 if (!res.ok) { document.getElementById('detailPageMeta').innerHTML = '<p style="color:var(--color-danger-fg);">' + esc(d.error || '加载失败') + '</p>'; return; }
                 const fmt = (n) => n == null ? '—' : (n < 1024 ? n + ' B' : (n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB'));
-                const typeTag = '<span style="padding:2px 10px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
+                const typeTag = '<span style="padding:2px 10px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:var(--gh-type-md);border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:var(--gh-type-project);border:1px solid rgba(187,134,252,.4);' : 'color:var(--gh-type-html);border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
                 const siteUrl = API_URL + (d.type === 'md' ? '/md/' : d.type === 'project' ? '/p/' : '/s/') + encodeURIComponent(d.name);
                 let actions = '<a href="' + siteUrl + '" target="_blank" class="btn btn-primary" style="padding:8px 16px;"><i class="fas fa-external-link-alt"></i> 访问</a>';
                 if (d.type !== 'project') {
@@ -640,7 +640,7 @@
                 });
                 const d = await res.json();
                 if (!res.ok) { document.getElementById('siteDetailBody').innerHTML = '<p style="color:var(--color-danger-fg);">' + esc(d.error || '加载失败') + '</p>'; return; }
-                const typeTag = '<span style="padding:2px 8px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
+                const typeTag = '<span style="padding:2px 8px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:var(--gh-type-md);border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:var(--gh-type-project);border:1px solid rgba(187,134,252,.4);' : 'color:var(--gh-type-html);border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
                 const fmt = (n) => n == null ? '—' : (n < 1024 ? n + ' B' : (n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB'));
                 let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin-bottom:12px;">';
                 html += '<div><span style="color:var(--color-fg-muted);">类型</span><br>' + typeTag + '</div>';
@@ -954,8 +954,8 @@
             const page = paginationState.playPosts.page;
             const rows = posts.map(p => {
                 const kindBadge = p.kind === 'site'
-                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;">站点</span>'
-                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;">帖子</span>';
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:var(--gh-type-html);border:1px solid rgba(3,218,198,.4);margin-left:6px;">站点</span>'
+                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:var(--gh-type-project);border:1px solid rgba(187,134,252,.4);margin-left:6px;">帖子</span>';
                 const time = new Date(p.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
                 const who = p.author?.nickname || p.author?.email || p.author_id || '—';
                 return `<tr>
