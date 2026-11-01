@@ -33,12 +33,15 @@ const ALLOWLIST = [
   ['POST',   '/api/delete'],
 
   // ---- 文件内容读写 ----
+  // 注意：`:path*` 表示「吞掉后面所有段」。文件在 PROJECT 站点里是可嵌套的
+  // （如 class/style.css、js/lib/a.js），路径段数不固定，
+  // 用固定段数的 :path 会让多层路径匹配不上而被 403。
   ['GET',    '/api/file/:slug'],
   ['GET',    '/api/file/:slug/:path'],
   ['GET',    '/api/site-files/:slug'],
-  ['GET',    '/api/proj-file/:slug/:path'],
-  ['PUT',    '/api/proj-file/:slug/:path'],
-  ['DELETE', '/api/proj-file/:slug/:path'],
+  ['GET',    '/api/proj-file/:slug/:path*'],
+  ['PUT',    '/api/proj-file/:slug/:path*'],
+  ['DELETE', '/api/proj-file/:slug/:path*'],
 
   // ---- 广场只读（浏览无害，写入见下）----
   ['GET',    '/api/play/posts'],
@@ -61,8 +64,19 @@ const COMPILED = ALLOWLIST.map(([m, p]) => ({
 }));
 
 function matchRule(rule, parts) {
-  if (rule.parts.length !== parts.length) return false;
-  for (let i = 0; i < parts.length; i++) {
+  // 末尾的 `:name*` 是通配段：吃掉剩余所有段，且至少要有一段。
+  // 例如 /api/proj-file/:slug/:path* 既能匹配 class/style.css，也能匹配 a/b/c.js。
+  const last = rule.parts[rule.parts.length - 1];
+  const wild = last && last.startsWith(':') && last.endsWith('*');
+
+  if (wild) {
+    if (parts.length < rule.parts.length) return false;   // 通配段至少要有一段
+  } else if (rule.parts.length !== parts.length) {
+    return false;
+  }
+
+  const fixed = wild ? rule.parts.length - 1 : rule.parts.length;
+  for (let i = 0; i < fixed; i++) {
     const rp = rule.parts[i];
     if (rp.startsWith(':')) continue;      // 占位符任意匹配
     if (rp !== parts[i]) return false;

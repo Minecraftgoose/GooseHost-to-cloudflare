@@ -912,7 +912,15 @@
 		'| **字体**        | 钉钉进步体（DingTalk JinBuTi）            |',
 		'项目结构分为 front/（前端页面）和 api/（Worker 后端），后端包含完整的 auth、sites、admin、jobs 等模块。',
 		'GooseHost 是一个面向新手、极简操作、基于 Cloudflare + Supabase 架构的开源静态托管平台，适合快速分享 HTML/Markdown 页面或小型前端项目，无需服务器、无需命令行，粘贴代码即可全球 CDN 加速访问。',
-		'当用户询问你关于GooseHost的问题时根据以上内容回答'
+		'当用户询问你关于GooseHost的问题时根据以上内容回答',
+		'',
+		'【第三方应用 · Goosecel】',
+		'- Goosecel：https://gscel.longmoon.top/',
+		'  Goosecel 是一个第三方 GooseHost 管理界面，用来查看和管理 GooseHost 账号下的站点。',
+		'  它不提供托管能力，所有站点仍然存储和运行在 GooseHost 上。',
+		'- 用户在账户页创建 API 密钥（gooseh- 开头）后，粘贴到 Goosecel 即可登录使用。',
+		'- 用户问「有没有别的管理工具」「第三方客户端」「Goosecel 是什么」时，据以上内容回答；',
+		'  涉及 Goosecel 自身的功能细节（它有哪些页面、怎么用）你并不掌握，如实说明并给出上面的网址让他自行查看。'
     ].join('\n');
     /* ===== 文本工具协议（Agnes 等不支持原生 function calling 的引擎）=====
        这类引擎会把工具调用以文本形式吐出来，例如：
