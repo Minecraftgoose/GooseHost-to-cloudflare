@@ -586,10 +586,93 @@ html[data-theme="light"][data-page="playground"] .pg-btn.primary:hover { color: 
 html[data-theme="dark"][data-page="home"] .faq-header span { color: rgba(255, 255, 255, 0.5) !important; }
 html[data-theme="dark"][data-page="home"] .footer .credit { color: rgba(255, 255, 255, 0.5) !important; }
 
+/* ===== AI Copilot：去掉亚克力/毛玻璃 =====
+ * copilot.css 整个是"亚克力"风格：面板一律半透明黑（rgba(0,0,0,0.18~0.45)）
+ * 再叠 backdrop-filter: blur(6~14px)。叠在 dashboard 的背景层上，
+ * 浅色模式下就是一层灰雾（"雾蒙蒙"）。这里改成不透明实色并关掉模糊。
+ */
+html[data-theme="light"][data-page="dashboard"] .cop-root {
+    /* 实色面板，替换半透明亚克力 */
+    --gai-acrylic-panel:  #ffffff;
+    --gai-acrylic-header: #ffffff;
+    --gai-acrylic-bar:    #f1f6f3;
+    --gai-acrylic-bubble: #e6f6ee;
+    --gai-surface:        #eef2ef;
+    --gai-surface-hover:  #e2eae5;
+    --gai-border:         rgba(0, 0, 0, 0.14);
+    --gai-text:           #14251c;
+    --gai-text-secondary: #4a5f54;
+    --gai-brand:          #007a42;
+    --gai-brand-soft:     rgba(0, 122, 66, 0.12);
+}
+/* 关掉模糊：浅底上 blur 正是灰雾感的来源 */
+html[data-theme="light"][data-page="dashboard"] .cop-chat-header,
+html[data-theme="light"][data-page="dashboard"] .cop-chat-center,
+html[data-theme="light"][data-page="dashboard"] .cop-input-wrap,
+html[data-theme="light"][data-page="dashboard"] .cop-right-panel,
+html[data-theme="light"][data-page="dashboard"] .cop-user-bubble,
+html[data-theme="light"][data-page="dashboard"] .cop-model-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 硬编码的半透明值（变量替换不到） */
+html[data-theme="light"][data-page="dashboard"] .cop-model-panel { background: #ffffff !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-item:hover { background: rgba(0, 122, 66, 0.10) !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-dot { background: rgba(0, 0, 0, 0.18) !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-model-div { background: rgba(0, 0, 0, 0.12) !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-seg { background: #eef2ef !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-overlay { background: rgba(20, 37, 28, 0.35) !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-mini-btn.danger:hover { background: rgba(179, 38, 30, 0.12) !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-ai-content code { background: #eef2ef !important; color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-ai-content pre { background: #f1f6f3 !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-ai-content blockquote { background: #f1f6f3 !important; }
+html[data-theme="light"][data-page="dashboard"] .cop-tool-out { background: #f1f6f3 !important; }
+
+/* 深色模式：面板也压实一点，避免背景图案透上来显得脏 */
+html[data-theme="dark"][data-page="dashboard"] .cop-root {
+    --gai-acrylic-panel:  #12181b;
+    --gai-acrylic-header: #12181b;
+    --gai-acrylic-bar:    #1a2126;
+    --gai-acrylic-bubble: #14312a;
+    --gai-surface:        #1a2126;
+    --gai-surface-hover:  #212a30;
+    --gai-border:         rgba(2, 255, 142, 0.18);
+}
+/* 发送/停止按钮是 --gai-brand 实心底。浅色下 brand 已压深成 #007a42（深绿），
+   这种底上必须用白字；深色字的 3.05 反而看不清。
+   注意 brand 同时被用作文字色（.cop-welcome-brand 等），那种场景深色是对的，不能一并改。*/
+html[data-theme="light"][data-page="dashboard"] .cop-send-btn,
+html[data-theme="light"][data-page="dashboard"] .cop-stop-btn { color: #ffffff !important; }
+
+/* 面板已是不透明实色，模糊既无效果又白耗 GPU，一并关掉 */
+html[data-theme="dark"][data-page="dashboard"] .cop-chat-header,
+html[data-theme="dark"][data-page="dashboard"] .cop-chat-center,
+html[data-theme="dark"][data-page="dashboard"] .cop-input-wrap,
+html[data-theme="dark"][data-page="dashboard"] .cop-right-panel,
+html[data-theme="dark"][data-page="dashboard"] .cop-user-bubble,
+html[data-theme="dark"][data-page="dashboard"] .cop-model-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html[data-theme="dark"][data-page="dashboard"] .cop-model-panel { background: #12181b !important; }
+html[data-theme="dark"][data-page="dashboard"] .cop-seg { background: #0d1114 !important; }
+html[data-theme="dark"][data-page="dashboard"] .cop-ai-content pre { background: #0d1114 !important; }
+html[data-theme="dark"][data-page="dashboard"] .cop-ai-content blockquote { background: #1a2126 !important; }
+html[data-theme="dark"][data-page="dashboard"] .cop-tool-out { background: #0d1114 !important; }
+html[data-theme="dark"][data-page="dashboard"] .cop-model-title { color: rgba(255, 255, 255, 0.55) !important; }
+
 /* ===== 深色模式：原生弱化小字偏暗（0.38~0.4 只有 3.5~3.8），统一提亮 ===== */
 html[data-theme="dark"][data-page="login"],
 html[data-theme="dark"][data-page="register"] { --text-muted: rgba(255, 255, 255, 0.52); }
 html[data-theme="dark"][data-page="playground"] { --text-3: rgba(255, 255, 255, 0.52); }
+/* dashboard 深色下 0.35~0.4 的弱化小字（站点日期、密钥时间、设置说明、空态）约 3.2~3.8 */
+html[data-theme="dark"][data-page="dashboard"] .site-meta,
+html[data-theme="dark"][data-page="dashboard"] .token-item-meta,
+html[data-theme="dark"][data-page="dashboard"] .form-hint,
+html[data-theme="dark"][data-page="dashboard"] .setting-desc,
+html[data-theme="dark"][data-page="dashboard"] .empty,
+html[data-theme="dark"][data-page="dashboard"] .type-desc { color: rgba(255, 255, 255, 0.55) !important; }
 html[data-theme="dark"][data-page="home"] .footer,
 html[data-theme="dark"][data-page="home"] .footer a,
 html[data-theme="dark"][data-page="home"] .footer .credit,
