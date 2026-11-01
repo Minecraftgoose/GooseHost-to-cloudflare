@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="dashboard" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="管理您的 GooseHost 网站，上传、部署、编辑和删除静态网站。">
@@ -55,6 +56,7 @@
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/dashboard/style.css">
     <link rel="stylesheet" href="/dashboard/copilot.css">
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body class="splash-active">
     <div class="splash-screen" id="splashScreen">
@@ -67,8 +69,6 @@
         <div class="welcome-text" id="welcomeText"></div>
     </div>
     <div id="bgLayer" class="bg-layer"></div>
-    <!-- ===== 国旗点阵（复用背景点位） ===== -->
-    <canvas id="flagDots" class="flag-dots" aria-hidden="true"></canvas>
     <!-- 顶部导航栏 -->
     <nav class="navbar">
         <!-- 竖屏：左侧 SVG Logo -->
@@ -691,7 +691,6 @@
          会阻塞整个面板渲染（连没改过的页面也一起遭殃）。
          copilot.js 会在真正需要打包 zip 时才动态加载，并自动回退国内 CDN。 -->
     <script src="/dashboard/copilot.js"></script>
-    <script src="../flag-dots.js"></script>
 	<script type="text/javascript" src="https://www.wjx.cn/js/ap.js?activity=hGAu84c" id="wjxFloatBtnJsCode"></script>
 
     <div id="deleteAccountDialog" class="custom-dialog">
@@ -708,10 +707,10 @@
                 <button id="deleteConfirmBtn" class="btn btn-danger" style="width:100%;justify-content:center;" onclick="deleteAccount()">
                     <i class="fas fa-user-slash"></i> 我确定，注销
                 </button>
-                <button onclick="closeDeleteModal()" style="margin-top:0.5rem;w">
-                <input type="hidden" id="editType">
-
-                <!-- HTML ç¼è¾é¢æ¿ -->
-                <div id="html-editor-panel">
-                    <div class="form-group drop-target">
-                        <label class="form
+                <button onclick="closeDeleteModal()" style="margin-top:0.5rem;width:100%;height:var(--input-height);border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:1rem;">取消</button>
+            </div>
+        </div>
+    </div>
+<script src="../theme.js"></script>
+</body>
+</html>

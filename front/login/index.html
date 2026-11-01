@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="login" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>登录 - GooseHost</title>
@@ -14,11 +15,10 @@
     <meta name="theme-color" content="#0a0f0d" />
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body>
     <div id="bgLayer" class="bg-layer"></div>
-    <!-- ===== 国旗点阵（复用背景点位） ===== -->
-    <canvas id="flagDots" class="flag-dots" aria-hidden="true"></canvas>
 
     <div class="page">
         <div class="card">
@@ -126,6 +126,6 @@
 
     <script type="module" src="/squircle.js"></script>
     <script src="app.js"></script>
-    <script src="../flag-dots.js"></script>
+<script src="../theme.js"></script>
 </body>
 </html>

@@ -1,0 +1,354 @@
+/* ===== GooseHost 全站主题（浅色 / 深色 / 跟随系统） =====
+ * 使用方式：html[data-theme="light"|"dark"] 决定实际配色
+ * 各页面通过 html[data-page="xxx"] 隔离，互不串味
+ * 必须在各页面自身样式之后加载
+ */
+
+/* ---------- 悬浮切换按钮 ---------- */
+.gh-theme-toggle {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 9998;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px; /* 胶囊化；admin 页面下方单独改回 6px */
+    border: 1px solid rgba(128, 128, 128, 0.28);
+    background: rgba(128, 128, 128, 0.14);
+    color: #57606a;
+    font-size: 15px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: background .2s, color .2s, border-color .2s, transform .15s;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+.gh-theme-toggle:hover {
+    background: rgba(128, 128, 128, 0.26);
+    transform: scale(1.06);
+}
+.gh-theme-toggle:active { transform: scale(0.94); }
+.gh-theme-toggle .gh-theme-dot { display: none; }
+/* admin 页面遵守「圆角一律 6px」规范 */
+html[data-page="admin"] .gh-theme-toggle { border-radius: 6px; }
+
+html[data-theme="dark"] .gh-theme-toggle {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.85);
+}
+html[data-theme="dark"] .gh-theme-toggle:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* =========================================================
+ *  深色为基准的页面 → 浅色覆盖
+ * ========================================================= */
+
+/* ---------- 首页 home ---------- */
+html[data-page="home"][data-theme="light"] .bg-layer { background-color: #f1f6f3 !important; }
+html[data-page="home"][data-theme="light"] body { color: #14251c; }
+html[data-page="home"][data-theme="light"] .glow-1 { background: rgba(0, 168, 84, 0.10) !important; }
+html[data-page="home"][data-theme="light"] .glow-2 { background: rgba(0, 168, 84, 0.07) !important; }
+html[data-page="home"][data-theme="light"] .hero::before { background: radial-gradient(ellipse at center 40%, rgba(255,255,255,0.75) 0%, transparent 65%) !important; }
+html[data-page="home"][data-theme="light"] .hero-title { color: #10231a !important; text-shadow: none !important; }
+html[data-page="home"][data-theme="light"] .hero-sub { color: #3f5349 !important; text-shadow: none !important; }
+html[data-page="home"][data-theme="light"] .hero-brand,
+html[data-page="home"][data-theme="light"] .hero-sub .hl,
+html[data-page="home"][data-theme="light"] .hero-stat .num,
+html[data-page="home"][data-theme="light"] .compare-vs,
+html[data-page="home"][data-theme="light"] .url-compare .url-arrow,
+html[data-page="home"][data-theme="light"] .url-compare .url-new { color: #008a45 !important; }
+html[data-page="home"][data-theme="light"] .hero-stat { border-top-color: rgba(0, 0, 0, 0.1) !important; }
+html[data-page="home"][data-theme="light"] .hero-stat .lbl { color: #6b7f74 !important; }
+html[data-page="home"][data-theme="light"] .glass-card {
+    background: #ffffff !important;
+    border-color: #dfe8e3 !important;
+    box-shadow: 0 8px 28px rgba(16, 35, 26, 0.08) !important;
+}
+html[data-page="home"][data-theme="light"] .section-head h2 { color: #10231a !important; }
+html[data-page="home"][data-theme="light"] .section-head p { color: #5b6f64 !important; }
+html[data-page="home"][data-theme="light"] .feature-card h3,
+html[data-page="home"][data-theme="light"] .compare-card h3 { color: #10231a !important; }
+html[data-page="home"][data-theme="light"] .feature-card p { color: #4d6157 !important; }
+html[data-page="home"][data-theme="light"] .compare-card li { color: #43564d !important; }
+html[data-page="home"][data-theme="light"] .url-compare {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+html[data-page="home"][data-theme="light"] .url-compare .url-old { color: #8b9a92 !important; }
+html[data-page="home"][data-theme="light"] .btn-api {
+    background: rgba(0, 168, 84, 0.08) !important;
+    color: #008a45 !important;
+    border-color: rgba(0, 168, 84, 0.35) !important;
+}
+html[data-page="home"][data-theme="light"] .btn-api:hover {
+    background: rgba(0, 168, 84, 0.15) !important;
+    color: #00703a !important;
+}
+html[data-page="home"][data-theme="light"] .hero-badge {
+    background: rgba(0, 168, 84, 0.1) !important;
+    border-color: rgba(0, 168, 84, 0.3) !important;
+    color: #008a45 !important;
+}
+html[data-page="home"][data-theme="light"] .faq-container:hover { border-color: rgba(0, 168, 84, 0.35) !important; }
+html[data-page="home"][data-theme="light"] .faq-header { border-bottom-color: rgba(0, 0, 0, 0.08) !important; }
+html[data-page="home"][data-theme="light"] .faq-header h3 { color: #10231a !important; }
+html[data-page="home"][data-theme="light"] .faq-header span { color: #8b9a92 !important; }
+html[data-page="home"][data-theme="light"] .faq-item { border-bottom-color: rgba(0, 0, 0, 0.07) !important; }
+html[data-page="home"][data-theme="light"] .faq-question .q-text { color: #22382d !important; }
+html[data-page="home"][data-theme="light"] .faq-answer .a-text { color: #4d6157 !important; }
+html[data-page="home"][data-theme="light"] .faq-question:hover { background: rgba(0, 168, 84, 0.06) !important; }
+html[data-page="home"][data-theme="light"] .footer,
+html[data-page="home"][data-theme="light"] .footer a { color: #556b60 !important; }
+html[data-page="home"][data-theme="light"] .footer .credit { color: #6d8177 !important; }
+html[data-page="home"][data-theme="light"] .footer a:hover { color: #008a45 !important; }
+html[data-page="home"][data-theme="light"] .feature-card i { color: #008a45 !important; }
+html[data-page="home"][data-theme="light"] .compare-card.good li i { color: #008a45 !important; }
+html[data-page="home"][data-theme="light"] .tutorial-frame,
+html[data-page="home"][data-theme="light"] .faq-video { background: #e9efec !important; }
+html[data-page="home"][data-theme="light"] .splash-screen { background: #f1f6f3 !important; }
+html[data-page="home"][data-theme="light"] .thanks-logo img { opacity: 1 !important; }
+
+/* ---------- 登录 / 注册 / 重置密码（变量化良好，重定义变量即可） ---------- */
+html[data-theme="light"][data-page="login"],
+html[data-theme="light"][data-page="register"],
+html[data-theme="light"][data-page="reset"] {
+    --bg-primary: #f1f6f3;
+    --bg-card: #ffffff;
+    --accent: #00a854;
+    --accent-dark: #008a45;
+    --text-primary: #14251c;
+    --text-secondary: #4a5f54;
+    --text-muted: #7b8f85;
+    --border: rgba(0, 0, 0, 0.14);
+    --border-focus: rgba(0, 168, 84, 0.5);
+    --success: #008a45;
+    --success-bg: rgba(0, 168, 84, 0.12);
+    --shadow: 0 12px 32px rgba(16, 35, 26, 0.12);
+}
+html[data-theme="light"][data-page="login"] .btn-primary,
+html[data-theme="light"][data-page="register"] .btn-primary,
+html[data-theme="light"][data-page="reset"] .btn-primary { color: #ffffff !important; }
+html[data-theme="light"][data-page="login"] .card,
+html[data-theme="light"][data-page="register"] .card,
+html[data-theme="light"][data-page="reset"] .card {
+    background: var(--bg-card) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+html[data-theme="light"][data-page="login"] input,
+html[data-theme="light"][data-page="register"] input { color: #14251c !important; }
+
+/* ---------- Dashboard ---------- */
+html[data-theme="light"][data-page="dashboard"] {
+    --bg-card: #ffffff;
+    --border: rgba(0, 0, 0, 0.12);
+    --border-focus: rgba(0, 168, 84, 0.5);
+    --text-secondary: #4a5f54;
+    --color-fg: #14251c;
+    --accent: #00a854;
+}
+html[data-theme="light"][data-page="dashboard"] body { background: #f1f6f3 !important; color: #14251c !important; }
+html[data-theme="light"][data-page="dashboard"] .bg-layer { background-color: #f1f6f3 !important; }
+html[data-theme="light"][data-page="dashboard"] .navbar { background: #ffffff !important; border-color: rgba(0, 0, 0, 0.08) !important; }
+html[data-theme="light"][data-page="dashboard"] .nav-item { color: #3f5349 !important; }
+html[data-theme="light"][data-page="dashboard"] .nav-item:hover,
+html[data-theme="light"][data-page="dashboard"] .nav-item.active { background: rgba(0, 168, 84, 0.12) !important; color: #008a45 !important; }
+html[data-theme="light"][data-page="dashboard"] .card,
+html[data-theme="light"][data-page="dashboard"] .stat-card,
+html[data-theme="light"][data-page="dashboard"] .dialog-card,
+html[data-theme="light"][data-page="dashboard"] .confirm-box,
+html[data-theme="light"][data-page="dashboard"] .skeleton {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 4px 18px rgba(16, 35, 26, 0.08) !important;
+}
+html[data-theme="light"][data-page="dashboard"] .stat-icon { background: rgba(0, 168, 84, 0.12) !important; }
+html[data-theme="light"][data-page="dashboard"] .btn-secondary,
+html[data-theme="light"][data-page="dashboard"] .site-actions a {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #22382d !important;
+    border-color: rgba(0, 0, 0, 0.14) !important;
+}
+html[data-theme="light"][data-page="dashboard"] .btn-secondary:hover { background: rgba(0, 0, 0, 0.1) !important; }
+html[data-theme="light"][data-page="dashboard"] .btn-primary { color: #ffffff !important; }
+html[data-theme="light"][data-page="dashboard"] .btn-danger { background: rgba(207, 34, 46, 0.1) !important; color: #cf222e !important; border-color: rgba(207, 34, 46, 0.35) !important; }
+html[data-theme="light"][data-page="dashboard"] input,
+html[data-theme="light"][data-page="dashboard"] textarea,
+html[data-theme="light"][data-page="dashboard"] select,
+html[data-theme="light"][data-page="dashboard"] .form-input {
+    background: #ffffff !important;
+    color: #14251c !important;
+    border-color: rgba(0, 0, 0, 0.16) !important;
+}
+html[data-theme="light"][data-page="dashboard"] .site-item,
+html[data-theme="light"][data-page="dashboard"] .quick-action,
+html[data-theme="light"][data-page="dashboard"] .file-drop-zone,
+html[data-theme="light"][data-page="dashboard"] .detail-files,
+html[data-theme="light"][data-page="dashboard"] .type-selector {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+html[data-theme="light"][data-page="dashboard"] .modal-body,
+html[data-theme="light"][data-page="dashboard"] .modal-header,
+html[data-theme="light"][data-page="dashboard"] .modal-footer { background: #ffffff !important; }
+html[data-theme="light"][data-page="dashboard"] .toast { background: #ffffff !important; color: #14251c !important; border-color: rgba(0, 0, 0, 0.12) !important; }
+html[data-theme="light"][data-page="dashboard"] .announcement-bar { background: rgba(0, 168, 84, 0.12) !important; color: #00703a !important; }
+html[data-theme="light"][data-page="dashboard"] .toggle-slider { background: rgba(0, 0, 0, 0.16) !important; }
+html[data-theme="light"][data-page="dashboard"] .toggle-slider::before { background: #ffffff !important; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+html[data-theme="light"][data-page="dashboard"] .setting-item,
+html[data-theme="light"][data-page="dashboard"] .token-item { border-color: rgba(0, 0, 0, 0.08) !important; }
+html[data-theme="light"][data-page="dashboard"] .deploy-nav .btn,
+html[data-theme="light"][data-page="dashboard"] .deploy-action .btn { color: #22382d !important; }
+
+/* ---------- 广场 playground ---------- */
+html[data-theme="light"][data-page="playground"] {
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --border: rgba(0, 0, 0, 0.12);
+    --border-focus: rgba(0, 168, 84, 0.5);
+    --text: #14251c;
+    --text-2: #4a5f54;
+    --text-3: #7b8f85;
+    --accent: #00a854;
+    --accent-dim: rgba(0, 168, 84, 0.12);
+}
+html[data-theme="light"][data-page="playground"] body { background: #f1f6f3 !important; color: var(--text) !important; }
+html[data-theme="light"][data-page="playground"] .bg-layer { background-color: #f1f6f3 !important; }
+html[data-theme="light"][data-page="playground"] .pg-navbar { background: rgba(255, 255, 255, 0.92) !important; border-color: rgba(0, 0, 0, 0.08) !important; }
+html[data-theme="light"][data-page="playground"] .pg-search,
+html[data-theme="light"][data-page="playground"] .pg-input,
+html[data-theme="light"][data-page="playground"] .pg-textarea {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #14251c !important;
+    border-color: rgba(0, 0, 0, 0.14) !important;
+}
+html[data-theme="light"][data-page="playground"] .pg-card,
+html[data-theme="light"][data-page="playground"] .pg-post,
+html[data-theme="light"][data-page="playground"] .pg-detail,
+html[data-theme="light"][data-page="playground"] .pg-modal-box,
+html[data-theme="light"][data-page="playground"] .pg-site-box {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+html[data-theme="light"][data-page="playground"] .pg-sort { background: rgba(0, 0, 0, 0.05) !important; }
+html[data-theme="light"][data-page="playground"] .pg-sort-btn { color: #4a5f54 !important; }
+html[data-theme="light"][data-page="playground"] .pg-sort-btn.on { background: #ffffff !important; color: #008a45 !important; }
+html[data-theme="light"][data-page="playground"] .pg-btn.outline { border-color: rgba(0, 0, 0, 0.16) !important; color: #22382d !important; }
+html[data-theme="light"][data-page="playground"] .pg-btn.ghost { color: #4a5f54 !important; }
+html[data-theme="light"][data-page="playground"] .pg-btn.primary { color: #ffffff !important; }
+html[data-theme="light"][data-page="playground"] .pg-toast { background: #ffffff !important; color: #14251c !important; }
+html[data-theme="light"][data-page="playground"] .pg-skeleton { background: rgba(0, 0, 0, 0.06) !important; }
+html[data-theme="light"][data-page="playground"] .pg-reply-hint { background: rgba(0, 0, 0, 0.05) !important; }
+html[data-theme="light"][data-page="playground"] .pg-modal-box { box-shadow: 0 12px 40px rgba(16, 35, 26, 0.18) !important; }
+
+/* =========================================================
+ *  浅色为基准的页面 → 深色覆盖
+ * ========================================================= */
+
+/* ---------- docs / api-docs / changelog / admin ---------- */
+html[data-theme="dark"][data-page="docs"],
+html[data-theme="dark"][data-page="apidocs"],
+html[data-theme="dark"][data-page="changelog"],
+html[data-theme="dark"][data-page="admin"] {
+    --color-fg-default: #e6edf3;
+    --color-fg-muted: #9198a1;
+    --color-fg-subtle: #6e7681;
+    --color-fg-on-emphasis: #ffffff;
+    --color-canvas-default: #0d1117;
+    --color-canvas-subtle: #161b22;
+    --color-canvas-inset: #010409;
+    --color-border-default: #30363d;
+    --color-border-muted: #21262d;
+    --color-accent-fg: #4493f8;
+    --color-accent-subtle: rgba(56, 139, 253, 0.15);
+    --color-success-fg: #3fb950;
+    --color-success-subtle: rgba(46, 160, 67, 0.15);
+    --color-danger-fg: #f85149;
+    --color-danger-subtle: rgba(248, 81, 73, 0.15);
+    --color-attention-fg: #d29922;
+    --color-attention-subtle: rgba(187, 128, 9, 0.15);
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="dark"][data-page="docs"] body,
+html[data-theme="dark"][data-page="apidocs"] body,
+html[data-theme="dark"][data-page="changelog"] body,
+html[data-theme="dark"][data-page="admin"] body {
+    background: #0d1117 !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"] .header,
+html[data-theme="dark"] .section,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .search-wrap,
+html[data-theme="dark"] .tab-nav,
+html[data-theme="dark"] .section-header {
+    background-color: #161b22 !important;
+    border-color: #30363d !important;
+}
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] input,
+html[data-theme="dark"] select {
+    background-color: #0d1117 !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+html[data-theme="dark"] table thead tr,
+html[data-theme="dark"] tbody tr:hover { background-color: #161b22 !important; }
+html[data-theme="dark"] td { border-bottom-color: #21262d !important; }
+html[data-theme="dark"] .btn-secondary {
+    background: #21262d !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"] .btn-secondary:hover { background: #30363d !important; }
+html[data-theme="dark"] .site-name,
+html[data-theme="dark"] .header-link.active { color: #4493f8 !important; }
+html[data-theme="dark"] .toast { background: #161b22 !important; }
+
+/* docs 系列：md 内容区与代码块 */
+html[data-theme="dark"][data-page="docs"] #md-content,
+html[data-theme="dark"][data-page="apidocs"] #md-content,
+html[data-theme="dark"][data-page="changelog"] #md-content { color: #e6edf3 !important; }
+html[data-theme="dark"] #md-content pre,
+html[data-theme="dark"] #md-content code {
+    background: #161b22 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"] #md-content pre .copy-btn {
+    background: #21262d !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"] #md-content blockquote { border-left-color: #3fb950 !important; }
+html[data-theme="dark"] #md-content table th,
+html[data-theme="dark"] #md-content table td { border-color: #30363d !important; }
+html[data-theme="dark"] .md-nav,
+html[data-theme="dark"] .sidebar { background: #161b22 !important; border-color: #30363d !important; }
+
+/* admin 深色下的补充 */
+html[data-theme="dark"][data-page="admin"] .admin-file-row,
+html[data-theme="dark"][data-page="admin"] .load-more-wrap { border-color: #30363d !important; }
+html[data-theme="dark"][data-page="admin"] .page-btn {
+    background: #21262d !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"][data-page="admin"] .page-btn.active {
+    background: rgba(46, 160, 67, 0.15) !important;
+    border-color: #3fb950 !important;
+    color: #3fb950 !important;
+}
+
+/* ---------- 状态跳转页 ---------- */
+html[data-theme="dark"][data-page="status"] body { background: #0d1117 !important; color: #e6edf3 !important; }
+html[data-theme="dark"][data-page="status"] .card {
+    background: #161b22 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+html[data-theme="dark"][data-page="status"] .card h1 { color: #e6edf3 !important; }
+html[data-theme="dark"][data-page="status"] .card p { color: #9198a1 !important; }

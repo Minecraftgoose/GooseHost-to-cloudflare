@@ -59,7 +59,7 @@
     background: transparent;
     border: none;
     color: var(--gai-text-secondary);
-    border-radius: 6px;
+    border-radius: 999px;
     cursor: pointer;
     font-size: 14px;
     transition: background .15s, color .15s;
@@ -256,7 +256,7 @@
     gap: 10px;
     width: 100%;
     padding: 8px 9px;
-    border-radius: 10px;
+    border-radius: 999px;
     background: transparent;
     border: 1px solid transparent;
     color: rgba(255, 255, 255, 0.72);
@@ -307,7 +307,7 @@
     display: inline-flex;
     background: rgba(0, 0, 0, 0.35);
     border: 1px solid var(--gai-border);
-    border-radius: 9px;
+    border-radius: 999px;
     padding: 2px;
     gap: 2px;
 }
@@ -317,7 +317,7 @@
     background: transparent;
     color: rgba(255, 255, 255, 0.5);
     font-size: 12px;
-    border-radius: 7px;
+    border-radius: 999px;
     cursor: pointer;
     transition: background .15s, color .15s;
 }
@@ -361,7 +361,7 @@
 .cop-icon-btn {
     width: 34px;
     height: 34px;
-    border-radius: var(--gai-radius-sm);
+    border-radius: 999px;
     border: none;
     background: transparent;
     color: var(--gai-text-secondary);
@@ -376,7 +376,7 @@
 .cop-send-btn {
     width: 34px;
     height: 34px;
-    border-radius: 50%;
+    border-radius: 999px;
     border: none;
     background: var(--gai-brand);
     color: #04120b;
@@ -392,7 +392,7 @@
 .cop-stop-btn {
     width: 34px;
     height: 34px;
-    border-radius: var(--gai-radius-sm);
+    border-radius: 999px;
     border: none;
     background: #ef4444;
     color: #fff;
@@ -422,7 +422,7 @@
     border: none;
     background: transparent;
     color: var(--gai-text-secondary);
-    border-radius: 6px;
+    border-radius: 999px;
     cursor: pointer;
     align-items: center;
     justify-content: center;
@@ -524,7 +524,7 @@
 }
 .cop-mini-btn {
     padding: 4px 9px;
-    border-radius: 6px;
+    border-radius: 999px;
     border: 1px solid var(--gai-border);
     background: var(--gai-acrylic-bar);
     color: var(--gai-text-secondary);

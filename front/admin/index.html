@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="admin" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理后台 - GooseHost</title>
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- 圆角规范：全站圆角一律 6px，禁止调大，禁止使用平滑大圆角/胶囊圆角 -->
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body>
     <!-- Header -->
@@ -352,5 +354,6 @@
     <script type="module" src="/squircle.js"></script>
     <script src="/auth-session.js"></script>
     <script src="app.js"></script>
+<script src="../theme.js"></script>
 </body>
 </html>

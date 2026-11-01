@@ -59,7 +59,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 点阵背景 */
         .bg-layer {
             position: fixed;
             inset: 0;
@@ -67,43 +66,10 @@
             opacity: 0;
             transition: opacity 0.8s ease;
             background-color: var(--bg-primary);
-            /* 单层点阵，无暗点 */
-            /* 白点层（后方点阵） */
-            background-image: radial-gradient(circle, rgba(255, 255, 255, 0.20) 0.8px, transparent 1.4px);
-            background-size: 8px 8px;
-            background-position: 0 0;
-        }
-        .bg-layer::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(circle, rgba(2, 255, 142, 0.28) 0.8px, transparent 1.4px);
-            background-size: 8px 8px;
-            background-position: 0 0;
-            opacity: 0;
-            animation: dotBreath 3.6s ease-in-out infinite;
-            pointer-events: none;
-        }
-        @keyframes dotBreath {
-            0%, 100% { opacity: 0; }
-            50%      { opacity: 1; }
         }
         .bg-layer.loaded {
             opacity: 1;
         }
-
-        /* ===== 国旗点阵层（复用背景点位，不新增视觉元素） ===== */
-        .flag-dots {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            display: block;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 1s ease;
-        }
-        .flag-dots.on { opacity: 1; }
-
 
         .page {
             position: relative;
@@ -262,7 +228,7 @@
             width: 100%;
             height: var(--input-height);
             border: none;
-            border-radius: var(--radius);
+            border-radius: 999px;
             font-size: var(--font-base);
             font-weight: 600;
             cursor: pointer;
@@ -337,7 +303,7 @@
             width: 100%;
             height: var(--input-height);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 999px;
             background: transparent;
             color: var(--text-secondary);
             font-size: var(--font-base);
@@ -462,7 +428,7 @@
             align-items: center;
             justify-content: center;
             border: none;
-            border-radius: 50%;
+            border-radius: 999px;
             background: transparent;
             color: var(--text-secondary);
             font-size: var(--font-sm);

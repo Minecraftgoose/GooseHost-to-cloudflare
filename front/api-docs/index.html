@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="apidocs" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="GooseHost API 文档，了解接口调用方式与参数说明。">
@@ -68,7 +69,7 @@
             font-size: 14px;
             font-weight: 500;
             padding: 6px 12px;
-            border-radius: var(--radius);
+            border-radius: 999px;
             white-space: nowrap;
             transition: background 0.2s;
         }
@@ -113,7 +114,7 @@
             right: 8px;
             background: var(--color-canvas-default);
             border: 1px solid var(--color-border-default);
-            border-radius: var(--radius);
+            border-radius: 999px;
             padding: 3px 10px;
             font-size: 11px;
             cursor: pointer;
@@ -206,6 +207,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body>
     <header class="header">
@@ -279,5 +281,6 @@
                     '<p style="margin-top:12px;">加载失败，请稍后刷新重试</p>';
             });
     </script>
+<script src="../theme.js"></script>
 </body>
 </html>

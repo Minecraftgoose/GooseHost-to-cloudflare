@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="status" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>服务状态 - GooseHost</title>
@@ -25,8 +26,7 @@
         .card {
             background: #fff;
             border: 1px solid #d0d7de;
-            border-radius: 6px; /* 圆角一律 6px，禁止加大，禁止平滑大圆角 */
-            box-shadow: 0 1px 0 rgba(27,31,36,0.04);
+            border-radius: 6px;
             padding: 28px;
             max-width: 480px;
             width: 100%;
@@ -40,7 +40,7 @@
             align-items: center;
             gap: 6px;
             padding: 6px 14px;
-            border-radius: 6px; /* 圆角一律 6px，禁止加大，禁止平滑大圆角 */
+            border-radius: 999px; /* 按钮胶囊化（admin 页面除外） */
             background: #1a7f37;
             border: 1px solid #1a7f37;
             color: #fff;
@@ -49,6 +49,7 @@
         }
         .card a:hover { background: #16692e; }
     </style>
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body>
     <div class="card">
@@ -61,5 +62,6 @@
         // 原自建状态页已删除，/status 现在直接跳转到新的 Upptime 状态页
         location.replace('https://status.goose.cc.cd/');
     </script>
+<script src="../theme.js"></script>
 </body>
 </html>

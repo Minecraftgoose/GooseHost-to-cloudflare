@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html data-page="playground" lang="zh-CN">
 <head>
+    <script>(function(){try{var m=localStorage.getItem('gh-theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-mode',m||'system');r.style.colorScheme=d?'dark':'light';}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="GooseHost 广场 —— 把你的站点发布到广场，和大家一起发帖、点赞、唠嗑。">
@@ -15,11 +16,10 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/playground/style.css">
+    <link rel="stylesheet" href="../theme.css">
 </head>
 <body>
     <div id="bgLayer" class="bg-layer"></div>
-    <!-- ===== 国旗点阵（复用背景点位） ===== -->
-    <canvas id="flagDots" class="flag-dots" aria-hidden="true"></canvas>
 
     <!-- ===== 顶部导航 ===== -->
     <nav class="pg-navbar">
@@ -167,6 +167,6 @@
 
     <script type="module" src="/squircle.js"></script>
     <script src="/playground/app.js"></script>
-    <script src="../flag-dots.js"></script>
+<script src="../theme.js"></script>
 </body>
 </html>

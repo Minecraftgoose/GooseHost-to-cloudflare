@@ -44,45 +44,12 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: rgba(2, 255, 142, 0.5); }
 * { scrollbar-width: thin; scrollbar-color: rgba(2, 255, 142, 0.25) rgba(255, 255, 255, 0.03); }
 
-/* ===== 点阵背景 ===== */
 .bg-layer {
     position: fixed; inset: 0; z-index: 0;
     opacity: 0; transition: opacity .5s ease;
     background-color: #0a0f0d;
-    /* 白点层（后方点阵） */
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.20) 0.8px, transparent 1.4px);
-    background-size: 8px 8px;
-    background-position: 0 0;
-}
-.bg-layer::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(2, 255, 142, 0.28) 0.8px, transparent 1.4px);
-    background-size: 8px 8px;
-    background-position: 0 0;
-    opacity: 0;
-    animation: dotBreath 3.6s ease-in-out infinite;
-    pointer-events: none;
-}
-@keyframes dotBreath {
-    0%, 100% { opacity: 0; }
-    50%      { opacity: 1; }
 }
 .bg-layer.loaded { opacity: 1; }
-
-        /* ===== 国旗点阵层（复用背景点位，不新增视觉元素） ===== */
-        .flag-dots {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            display: block;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 1s ease;
-        }
-        .flag-dots.on { opacity: 1; }
-
 
 /* ===== 顶部导航 ===== */
 .pg-navbar {
@@ -213,7 +180,6 @@ body {
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-/* 站点卡（含预览图占位） */
 .pg-site-box {
     display: flex; gap: 12px; align-items: stretch;
     margin-top: 12px; padding: 10px;
@@ -233,7 +199,7 @@ body {
 .pg-site-url { font-size: 13px; color: var(--accent); word-break: break-all; }
 .pg-site-visit {
     align-self: flex-start;
-    font-size: 12px; padding: 5px 12px; border-radius: 6px;
+    font-size: 12px; padding: 5px 12px; border-radius: 999px;
     background: rgba(2, 255, 142, 0.14); color: var(--accent);
     text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
     transition: background .2s;
@@ -282,7 +248,7 @@ body {
 
 /* ===== 按钮 ===== */
 .pg-btn {
-    border: 1px solid transparent; border-radius: 8px;
+    border: 1px solid transparent; border-radius: 999px;
     padding: 9px 18px; font-size: 14px; font-family: inherit;
     cursor: pointer; transition: all .2s;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -426,7 +392,7 @@ body {
 .pg-site-options { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
 .pg-site-option {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 20px; cursor: pointer;
+    padding: 10px 12px; border-radius: 999px; cursor: pointer;
     border: 1px solid var(--border); background: rgba(255, 255, 255, 0.03);
     transition: all .2s;
 }
