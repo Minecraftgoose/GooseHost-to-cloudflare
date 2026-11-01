@@ -1,4 +1,5 @@
-        const API_URL = 'https://page.goose.cc.cd';
+/* ===== 圆角规范 ===== 全站圆角一律 6px：禁止调大，禁止使用平滑大圆角/胶囊圆角（999px、50%、24px+ 等）。内联样式中的 border-radius 统一写 6px。 */
+                const API_URL = 'https://page.goose.cc.cd';
         let pendingDeleteSite = null;
         let pendingDeleteUser = null;
         let allData = { sites: [], users: [] };
@@ -308,10 +309,10 @@
                 const siteUrl = API_URL + urlPrefix + encodeURIComponent(site.name);
 
                 const typeBadge = site.type === 'md'
-                    ? '<span style="padding:1px 7px;border-radius:999px;font-size:10px;color:#f9a825;border:1px solid rgba(249,168,37,.4);margin-left:6px;vertical-align:1px;">MD</span>'
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#f9a825;border:1px solid rgba(249,168,37,.4);margin-left:6px;vertical-align:1px;">MD</span>'
                     : site.type === 'project'
-                    ? '<span style="padding:1px 7px;border-radius:999px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;vertical-align:1px;">PROJECT</span>'
-                    : '<span style="padding:1px 7px;border-radius:999px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;vertical-align:1px;">HTML</span>';
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;vertical-align:1px;">PROJECT</span>'
+                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;vertical-align:1px;">HTML</span>';
                 return `<tr onclick="openSiteDetailPage('${escJsAttr(site.name)}')" style="cursor:pointer;">
                     <td><a href="javascript:void(0)" onclick="event.stopPropagation();openSiteDetailPage('${escJsAttr(site.name)}')" class="site-name">${esc(site.name)}</a>${typeBadge}</td>
                     <td style="color:var(--color-fg-default);font-size:13px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(site.ownerEmail || site.owner_id || '—')}">${esc(site.ownerEmail || site.owner_id || '—')}</td>
@@ -527,7 +528,7 @@
                 const d = await res.json();
                 if (!res.ok) { document.getElementById('detailPageMeta').innerHTML = '<p style="color:var(--color-danger-fg);">' + esc(d.error || '加载失败') + '</p>'; return; }
                 const fmt = (n) => n == null ? '—' : (n < 1024 ? n + ' B' : (n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB'));
-                const typeTag = '<span style="padding:2px 10px;border-radius:999px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
+                const typeTag = '<span style="padding:2px 10px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
                 const siteUrl = API_URL + (d.type === 'md' ? '/md/' : d.type === 'project' ? '/p/' : '/s/') + encodeURIComponent(d.name);
                 let actions = '<a href="' + siteUrl + '" target="_blank" class="btn btn-primary" style="padding:8px 16px;"><i class="fas fa-external-link-alt"></i> 访问</a>';
                 if (d.type !== 'project') {
@@ -542,15 +543,15 @@
                     ['IP', esc(d.ip_address || '—')],
                     ['创建', d.created_at ? new Date(d.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '—'],
                     ['更新', d.updated_at ? new Date(d.updated_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '—']
-                ].map(([k, v]) => '<div style="background:var(--color-canvas-subtle);border:1px solid var(--color-border-muted);border-radius:8px;padding:10px 14px;"><div style="font-size:11px;color:var(--color-fg-muted);margin-bottom:4px;">' + k + '</div><div style="font-size:13px;word-break:break-all;">' + v + '</div></div>').join('');
+                ].map(([k, v]) => '<div style="background:var(--color-canvas-subtle);border:1px solid var(--color-border-muted);border-radius:6px;padding:10px 14px;"><div style="font-size:11px;color:var(--color-fg-muted);margin-bottom:4px;">' + k + '</div><div style="font-size:13px;word-break:break-all;">' + v + '</div></div>').join('');
                 document.getElementById('detailPageMeta').innerHTML = meta;
                 document.getElementById('detailPageContentSection').style.display = 'none';
                 if (d.type === 'project' && d.files) {
                     document.getElementById('detailPageFilesSection').style.display = '';
                     document.getElementById('detailPageFiles').innerHTML =
                         '<div style="font-size:12px;color:var(--color-fg-muted);margin-bottom:8px;">共 ' + d.files.files.length + ' 个文件 · ' + fmt(d.files.totalSize) + '（可拖拽文件到行上替换）</div>' +
-                        '<div style="border:1px solid var(--color-border-muted);border-radius:8px;background:var(--color-canvas-subtle);">' +
-                        d.files.files.map(f => '<div class="admin-file-row" data-path="' + esc(f.name) + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 12px;font-size:12px;border-bottom:1px solid var(--color-border-muted);font-family:monospace;word-break:break-all;"><span>' + esc(f.name) + '</span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;"><span style="color:var(--color-fg-muted);">' + fmt(f.size) + '</span><button onclick="adminEditProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-success-subtle);border:1px solid var(--color-success-fg);color:var(--color-success-fg);border-radius:4px;font-size:11px;padding:1px 7px;cursor:pointer;">编辑</button><button onclick="adminDeleteProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-danger-subtle);border:1px solid var(--color-danger-fg);color:var(--color-danger-fg);border-radius:4px;font-size:11px;padding:1px 7px;cursor:pointer;">删除</button></span></div>').join('') +
+                        '<div style="border:1px solid var(--color-border-muted);border-radius:6px;background:var(--color-canvas-subtle);">' +
+                        d.files.files.map(f => '<div class="admin-file-row" data-path="' + esc(f.name) + '" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 12px;font-size:12px;border-bottom:1px solid var(--color-border-muted);font-family:monospace;word-break:break-all;"><span>' + esc(f.name) + '</span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;"><span style="color:var(--color-fg-muted);">' + fmt(f.size) + '</span><button onclick="adminEditProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-success-subtle);border:1px solid var(--color-success-fg);color:var(--color-success-fg);border-radius:6px;font-size:11px;padding:1px 7px;cursor:pointer;">编辑</button><button onclick="adminDeleteProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-danger-subtle);border:1px solid var(--color-danger-fg);color:var(--color-danger-fg);border-radius:6px;font-size:11px;padding:1px 7px;cursor:pointer;">删除</button></span></div>').join('') +
                         '</div>';
                 } else {
                     document.getElementById('detailPageFilesSection').style.display = 'none';
@@ -639,7 +640,7 @@
                 });
                 const d = await res.json();
                 if (!res.ok) { document.getElementById('siteDetailBody').innerHTML = '<p style="color:var(--color-danger-fg);">' + esc(d.error || '加载失败') + '</p>'; return; }
-                const typeTag = '<span style="padding:2px 8px;border-radius:999px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
+                const typeTag = '<span style="padding:2px 8px;border-radius:6px;font-size:11px;' + (d.type === 'md' ? 'color:#f9a825;border:1px solid rgba(249,168,37,.4);' : d.type === 'project' ? 'color:#bb86fc;border:1px solid rgba(187,134,252,.4);' : 'color:#03dac6;border:1px solid rgba(3,218,198,.4);') + '">' + esc(d.type || 'html').toUpperCase() + '</span>';
                 const fmt = (n) => n == null ? '—' : (n < 1024 ? n + ' B' : (n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB'));
                 let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin-bottom:12px;">';
                 html += '<div><span style="color:var(--color-fg-muted);">类型</span><br>' + typeTag + '</div>';
@@ -652,7 +653,7 @@
                 if (d.type === 'project' && d.files) {
                     html += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--color-fg-default);">文件列表（' + d.files.files.length + ' 个 · 共 ' + fmt(d.files.totalSize) + '）</div>';
                     html += '<div style="border:1px solid var(--color-border-muted);border-radius:6px;background:var(--color-canvas-subtle);">';
-                    html += d.files.files.map(f => '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--color-border-muted);font-family:monospace;word-break:break-all;"><span>' + esc(f.name) + '</span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;"><span style="color:var(--color-fg-muted);">' + fmt(f.size) + '</span><button onclick="adminEditProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-success-subtle);border:1px solid var(--color-success-fg);color:var(--color-success-fg);border-radius:4px;font-size:11px;padding:1px 7px;cursor:pointer;">编辑</button><button onclick="adminDeleteProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-danger-subtle);border:1px solid var(--color-danger-fg);color:var(--color-danger-fg);border-radius:4px;font-size:11px;padding:1px 7px;cursor:pointer;">删除</button></span></div>').join('');
+                    html += d.files.files.map(f => '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--color-border-muted);font-family:monospace;word-break:break-all;"><span>' + esc(f.name) + '</span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;"><span style="color:var(--color-fg-muted);">' + fmt(f.size) + '</span><button onclick="adminEditProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-success-subtle);border:1px solid var(--color-success-fg);color:var(--color-success-fg);border-radius:6px;font-size:11px;padding:1px 7px;cursor:pointer;">编辑</button><button onclick="adminDeleteProjFile(\'' + name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\',\'' + f.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" style="background:var(--color-danger-subtle);border:1px solid var(--color-danger-fg);color:var(--color-danger-fg);border-radius:6px;font-size:11px;padding:1px 7px;cursor:pointer;">删除</button></span></div>').join('');
                     html += '</div>';
                 } else if (d.type === 'md' && d.md !== undefined) {
                     html += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--color-fg-default);">Markdown 内容</div><pre style="background:var(--color-canvas-inset);border:1px solid var(--color-border-muted);border-radius:6px;padding:10px;font-size:12px;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all;">' + esc(d.md.substring(0, 2000)) + (d.md.length > 2000 ? '...（内容过长，仅预览前 2000 字符）' : '') + '</pre>';
@@ -953,8 +954,8 @@
             const page = paginationState.playPosts.page;
             const rows = posts.map(p => {
                 const kindBadge = p.kind === 'site'
-                    ? '<span style="padding:1px 7px;border-radius:999px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;">站点</span>'
-                    : '<span style="padding:1px 7px;border-radius:999px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;">帖子</span>';
+                    ? '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#03dac6;border:1px solid rgba(3,218,198,.4);margin-left:6px;">站点</span>'
+                    : '<span style="padding:1px 7px;border-radius:6px;font-size:10px;color:#bb86fc;border:1px solid rgba(187,134,252,.4);margin-left:6px;">帖子</span>';
                 const time = new Date(p.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
                 const who = p.author?.nickname || p.author?.email || p.author_id || '—';
                 return `<tr>

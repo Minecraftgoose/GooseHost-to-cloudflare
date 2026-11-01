@@ -80,19 +80,35 @@ export async function handleAdminUsers(request, env, corsHeaders) {
       }, 200, corsHeaders);
     }
 
-    const users = (data || []).map(row => ({
+    const rows = data || [];
+
+    // 修复分页总数：之前 map 后的对象里没有 total_count 字段，
+    // `users[0]?.total_count` 恒为 undefined → 退化成 users.length（= 每页条数 50），
+    // 于是 total 永远等于一页大小，66 个用户也只显示 50 条且没有第 2 页。
+    // 现在先把 RPC 返回的 total_count 透传出来，再单独取总数并剔除，避免污染用户对象。
+    const users = rows.map(row => ({
       id: row.owner_id,
       email: row.email,
       siteCount: parseInt(row.site_count),
       createdAt: row.created_at,
-      sites: (row.sites || []).map(s => ({ 
-        name: s.name, 
+      totalCount: parseInt(row.total_count ?? row.total ?? row.full_count, 10),
+      sites: (row.sites || []).map(s => ({
+        name: s.name,
         type: s.type,
-        url: `${getPublicBaseUrl(env)}${buildSiteUrl(s)}` 
+        url: `${getPublicBaseUrl(env)}${buildSiteUrl(s)}`
       }))
     }));
 
-    const totalCount = users.length > 0 ? parseInt(users[0]?.total_count || users.length) : 0;
+    const firstTotal = users.length > 0 ? users[0].totalCount : NaN;
+    let totalCount = Number.isFinite(firstTotal) && firstTotal > 0 ? firstTotal : 0;
+
+    // 兜底：RPC 没返回 total_count 时，按「本页是否已满」保守估算，
+    // 保证至少还能翻到下一页，不会把总数锁死在一页大小上。
+    if (!totalCount) {
+      totalCount = offset + users.length + (users.length >= limit ? 1 : 0);
+    }
+
+    users.forEach(u => delete u.totalCount);
 
     return jsonResp({
       users,
