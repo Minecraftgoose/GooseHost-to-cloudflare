@@ -76,7 +76,7 @@
   }
 
   function avoidCollision() {
-    // 右下角可能已有别的悬浮件（如问卷浮标），叠在一起会互相挡住。
+    // 右下角可能已有别的悬浮件（如第三方客服/反馈挂件），叠在一起会互相挡住。
     // 检测后把自己上移一格，避免遮挡。
     var btn = document.getElementById('ghThemeToggle');
     if (!btn) return;
