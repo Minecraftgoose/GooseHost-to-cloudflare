@@ -5,6 +5,25 @@
 > 记录 GooseHost 的每一次更新。
 
 ---
+## 🎨 v1.2.6 - 2026年11月4日
+
+### 界面
+
+GooseHost支持深浅色切换（托管的markdown暂未支持）
+
+GooseHost修复大部分旧版界面的直角按钮
+
+删除密集恐惧症的点阵
+
+### CLI近期更新：
+
+放弃对GooseHostPHP的支持
+
+### 近期小动态
+
+GooseHost主页最下面可以看到：
+
+![sjb0003](https://xiaoxianghost.42web.io/imageupdate/image/297105.png)
 
 ## 🚀 v1.2.5 - 2026年10月6日
 
@@ -19,7 +38,7 @@ GooseHost改为使用令牌登录，每人可创建20个令牌
 #### cors
 GooseHost的cors已经开放，你可以在你自己的页面集成GooseHost（配合令牌）
 
-## 🎨 v1.2.4 - 2026n年10月5日
+## 🎨 v1.2.4 - 2026年10月5日
 
 ### UI升级
 
