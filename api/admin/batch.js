@@ -17,6 +17,10 @@ import {
 
 const SELF_BLOCK = '不能封禁、解封或删除当前登录的管理员账号';
 
+// 有限并发：删站要逐站列 Storage 目录再分批删除，串行太慢会顶到前端超时。
+// 删用户涉及 Auth 删除，保守一点；封禁/解封只是一次 Auth 调用，可以稍高。
+const CONCURRENCY = { sites: 3, userDelete: 2, userBan: 4 };
+
 async function readBody(request) {
   try { return await request.json(); } catch { return null; }
 }
@@ -36,7 +40,8 @@ export async function batchUsersCore(supabase, env, body, adminId) {
     return setUserBanCore(supabase, env, uid, action, duration);
   };
 
-  const report = await runBatch(parsed.ids, worker);
+  const report = await runBatch(parsed.ids, worker,
+    action === 'delete' ? CONCURRENCY.userDelete : CONCURRENCY.userBan);
   return {
     status: 200,
     data: {
@@ -55,7 +60,7 @@ export async function batchUsersCore(supabase, env, body, adminId) {
 export async function batchSitesCore(supabase, env, body) {
   const parsed = parseSiteNames(body?.siteNames);
   if (parsed.error) return { status: 400, data: { error: parsed.error } };
-  const report = await runBatch(parsed.names, (name) => deleteSiteCore(supabase, env, name));
+  const report = await runBatch(parsed.names, (name) => deleteSiteCore(supabase, env, name), CONCURRENCY.sites);
   return {
     status: 200,
     data: { success: report.failed === 0, action: 'delete', ...report },

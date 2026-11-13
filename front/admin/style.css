@@ -195,7 +195,10 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 .gh-table-wrap { overflow-x: auto; }
 .gh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gh-table th { padding: 10px 14px; text-align: left; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--gh-a-muted); background: var(--gh-a-surface-2); border-bottom: 1px solid var(--gh-a-border-soft); white-space: nowrap; }
+.gh-table th.gh-th-check { width: 38px; padding-right: 0; }
+.gh-table th.gh-th-actions { text-align: right; }
 .gh-table td { padding: 11px 14px; border-bottom: 1px solid var(--gh-a-border-soft); vertical-align: middle; }
+.gh-table td.gh-cell-select { width: 38px; padding-right: 0; cursor: pointer; }
 .gh-table tbody tr:last-child td { border-bottom: none; }
 .gh-table tbody tr:hover { background: var(--gh-a-surface-2); }
 .gh-table .gh-row-click { cursor: pointer; }
@@ -203,7 +206,9 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 .gh-table .gh-cell-muted { color: var(--gh-a-muted); font-size: 12px; }
 .gh-table .gh-nowrap { white-space: nowrap; }
 .gh-table .gh-ellipsis { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gh-cell-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+/* 之前给 td 设 display:flex 会让它脱离表格列布局，进一步加剧表头/内容错位 */
+.gh-cell-actions { white-space: nowrap; text-align: right; }
+.gh-cell-actions > * + * { margin-left: 4px; }
 .gh-sort { cursor: pointer; user-select: none; }
 .gh-sort i { margin-left: 4px; font-size: 10px; color: var(--gh-a-subtle); }
 
@@ -260,6 +265,7 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 .gh-toast.show { opacity: 1; transform: translateY(0); }
 .gh-toast.success { border-color: var(--gh-a-success); background: var(--gh-a-success-soft); color: var(--gh-a-success); }
 .gh-toast.error { border-color: var(--gh-a-danger); background: var(--gh-a-danger-soft); color: var(--gh-a-danger); }
+.gh-toast.warn { border-color: var(--gh-a-warn); background: var(--gh-a-warn-soft); color: var(--gh-a-warn); }
 
 /* ===== 响应式 ===== */
 @media (max-width: 900px) {

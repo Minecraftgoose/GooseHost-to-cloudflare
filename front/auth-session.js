@@ -343,6 +343,13 @@
     async function apiFetch(url, options) {
         options = options || {};
 
+        // 默认 15s 只适合普通读写；批量删站要逐站递归列 Storage 目录再删文件，
+        // 服务端可能跑几十秒甚至更久。调用方可通过 options.timeoutMs 放宽，
+        // 且超时错误带 isTimeout 标记，上层可据此做「自动刷新核对」而不是误报失败。
+        var timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000;
+        var fetchOpts = Object.assign({}, options);
+        delete fetchOpts.timeoutMs;   // 不要把自定义字段透传给 fetch
+
         // 临近过期就提前续期
         var t = currentToken();
         var exp = t ? jwtExpiry(t) : null;
@@ -356,18 +363,18 @@
         }
 
         var controller = new AbortController();
-        var timer = setTimeout(function () { controller.abort(); }, 15000);
+        var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
         try {
-            var res = await fetchWithAuth(url, options, controller.signal);
+            var res = await fetchWithAuth(url, fetchOpts, controller.signal);
 
             if (res.status === 401) {
                 var r = await ensureFresh(true);
                 if (r.ok) {
-                    // 换新令牌后重试一次
+                    // 换新令牌后重试一次（重试同样使用调用方给的超时）
                     var c2 = new AbortController();
-                    var t2 = setTimeout(function () { c2.abort(); }, 15000);
+                    var t2 = setTimeout(function () { c2.abort(); }, timeoutMs);
                     try {
-                        res = await fetchWithAuth(url, options, c2.signal);
+                        res = await fetchWithAuth(url, fetchOpts, c2.signal);
                     } finally {
                         clearTimeout(t2);
                     }
@@ -388,7 +395,12 @@
             }
             return res;
         } catch (e) {
-            if (e && e.name === 'AbortError') throw new Error('请求超时');
+            if (e && e.name === 'AbortError') {
+                var te = new Error('请求超时');
+                te.isTimeout = true;
+                te.timeoutMs = timeoutMs;
+                throw te;
+            }
             throw e;
         } finally {
             clearTimeout(timer);

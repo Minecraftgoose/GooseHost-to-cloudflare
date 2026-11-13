@@ -23,6 +23,12 @@
     const PAGE_SIZE = 25;
     const BATCH_MAX = { users: 25, sites: 50 };   // 与后端 MAX_BATCH_* 对齐
 
+    // 批量删站要逐站列 Storage 目录 + 分批 remove，服务端可能跑几十秒。
+    // 之前全站统一 15s（写死在 auth-session.js），响应还没回来前端就报「请求超时」，
+    // 但删除其实已经在服务端完成——刷新就能看到。这里给慢接口 3 分钟。
+    const LONG_TIMEOUT_MS = 180000;
+    const LONG_TIMEOUT_RE = /^\/api\/admin\/(batch-sites|batch-users|delete-site|delete-user|ban-user|cleanup-orphans|sync-emails)/;
+
     const view = document.getElementById('view');
     const crumbEl = document.getElementById('breadcrumb');
     const overlay = document.getElementById('modalOverlay');
@@ -135,7 +141,17 @@
     }
     function tableHtml(headers, rows, emptyHtml) {
         if (!rows.length) return emptyHtml || empty('fa-inbox', '暂无数据');
-        return `<div class="gh-table-wrap"><table class="gh-table"><thead><tr>${headers.join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+        // 之前 headers.join('') 直接把裸文字塞进 <tr>，浏览器只渲染成一个文本节点，
+        // 于是表头挤成一坨、与 td 列完全对不上。这里统一包成 <th>，并给复选框列/
+        // 操作列专属 class，保证列宽与数据行一致。
+        const ths = headers.map((h, i) => {
+            const text = String(h == null ? '' : h);
+            const isCheck = /<input/i.test(text) || text.indexOf('select-all') >= 0;
+            const isActions = i === headers.length - 1 && text.trim() === '';
+            const cls = isCheck ? 'gh-th-check' : (isActions ? 'gh-th-actions' : '');
+            return `<th${cls ? ` class="${cls}"` : ''}>${text}</th>`;
+        }).join('');
+        return `<div class="gh-table-wrap"><table class="gh-table"><thead><tr>${ths}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
     }
     function siteLink(s) { return s.url || (API_URL + (s.type === 'md' ? '/md/' : s.type === 'project' ? '/p/' : '/s/') + encodeURIComponent(s.name)); }
 
@@ -156,7 +172,8 @@
         }
         const headers = Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + token });
         if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-        const res = await GHAuth.apiFetch(url, Object.assign({}, opts, { method: method, headers: headers }));
+        const timeoutMs = opts.timeoutMs || (LONG_TIMEOUT_RE.test(path) ? LONG_TIMEOUT_MS : 15000);
+        const res = await GHAuth.apiFetch(url, Object.assign({}, opts, { method: method, headers: headers, timeoutMs: timeoutMs }));
         let data = null;
         try { data = await res.json(); } catch (_) { /* 允许空响应 */ }
         if (res.status === 401) { location.href = '../login/'; throw new Error('登录已过期，请重新登录'); }
@@ -170,6 +187,18 @@
     function post(path, body, method) {
         return api(path, { method: method || 'POST', body: JSON.stringify(body || {}) });
     }
+    /**
+     * 写操作超时 ≠ 写操作失败。
+     * 批量删站经常是「服务端还在删，前端先放弃」，用户一刷新发现其实删完了。
+     * 这里不报红色失败，而是等一下、强制绕过缓存重新拉一次数据，并把判断口径说清楚。
+     */
+    async function recoverFromTimeout(label) {
+        toast(`${label}：响应超时，服务端可能仍在执行，正在核对最新数据…`, 'warn');
+        await new Promise(r => setTimeout(r, 2500));
+        forceRefresh = true;
+        try { await renderRoute(); } catch (_) { /* GET 也失败时仍保留下面的说明 */ }
+        toast('已按最新数据刷新：目标消失即代表删除已完成，请勿重复提交；若仍在请稍后再刷新', 'warn');
+    }
     async function afterWrite(fn, successMsg, backTo) {
         try {
             const r = await fn();
@@ -178,7 +207,11 @@
             if (backTo) navigate(backTo);
             else await renderRoute();
             return r;
-        } catch (e) { toast(e.message, 'error'); return null; }
+        } catch (e) {
+            if (e && e.isTimeout) await recoverFromTimeout('写入操作');
+            else toast(e.message, 'error');
+            return null;
+        }
     }
 
     /* ------------------------------------------------------------------
@@ -247,6 +280,8 @@
     function reload() { return renderRoute(); }
 
     async function renderRoute() {
+        // 换视图就清空勾选：避免「在站点列表勾了几个 → 进用户详情」时误删
+        clearSelection();
         const token = currentToken();
         const route = parseRoute();
         setActiveNav(route.section);
@@ -325,6 +360,20 @@
         if (scope) { sel(scope).clear(); updateSelectionUI(scope); }
         else { Object.keys(state.selection).forEach(k => { sel(k).clear(); updateSelectionUI(k); }); }
     }
+    /** 统一勾选入口：超过上限时返回 false，调用方负责把复选框复原 */
+    function applySelect(scope, id, checked) {
+        if (!scope || !state.selection[scope] || !id) return false;
+        const set = sel(scope);
+        if (checked) {
+            if (!set.has(id) && set.size >= BATCH_MAX[scope]) {
+                toast(`单次最多选择 ${BATCH_MAX[scope]} 项`, 'error');
+                return false;
+            }
+            set.add(id);
+        } else set.delete(id);
+        updateSelectionUI(scope);
+        return true;
+    }
     function selectionBarInner(scope) {
         const ids = [...sel(scope)];
         if (!ids.length) return `<span class="gh-batch-hint">勾选多行可批量操作（单次最多 ${BATCH_MAX[scope]} 项）</span>`;
@@ -399,7 +448,10 @@
             clearSelection(cfg.scope);
             forceRefresh = true;
             await reload();
-        } catch (e) { toast(e.message, 'error'); }
+        } catch (e) {
+            if (e && e.isTimeout) await recoverFromTimeout(cfg.title);
+            else toast(e.message, 'error');
+        }
     }
     function applyBan(ids, action, duration) {
         if (!ids.length) return;
@@ -448,7 +500,7 @@
             <td class="gh-cell-strong gh-mono">${esc(s.name)}</td><td>${typeBadge(s.type)}</td>
             <td class="gh-cell-muted">${esc(s.ownerEmail || s.ownerId || '—')}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.createdAt)}</td>
-            <td class="gh-cell-actions"><button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}">查看</button></td></tr>`);
+            <td class="gh-cell-actions" data-action="actions-cell"><button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}">查看</button></td></tr>`);
         html += card('fa-clock-rotate-left', '最近创建的站点', tableHtml(
             ['站点', '类型', '所有者', '创建时间', ''], siteRows, empty('fa-globe', '暂无站点')
         ));
@@ -458,7 +510,7 @@
             <td class="gh-mono gh-cell-muted">${shortUid(u.uid)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(u.createdAt)}</td>
             <td class="gh-cell-muted">${fmtNum(u.siteCount)}</td>
-            <td class="gh-cell-actions"><button class="gh-btn gh-btn-sm" data-action="open-user" data-uid="${esc(u.uid)}">查看</button></td></tr>`);
+            <td class="gh-cell-actions" data-action="actions-cell"><button class="gh-btn gh-btn-sm" data-action="open-user" data-uid="${esc(u.uid)}">查看</button></td></tr>`);
         html += card('fa-user-plus', '最近注册的用户', tableHtml(
             ['邮箱', '名字', 'UID', '注册时间', '站点数', ''], userRows, empty('fa-users', '暂无用户')
         ), `<button class="gh-btn gh-btn-sm" data-action="back" data-to="users">查看全部用户 <i class="fas fa-arrow-right"></i></button>`);
@@ -490,7 +542,7 @@
                 ? `<button class="gh-btn gh-btn-sm" data-action="unban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" title="解除封禁"><i class="fas fa-lock-open"></i></button>`
                 : `<button class="gh-btn gh-btn-sm" data-action="ban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" title="封禁用户"><i class="fas fa-ban"></i></button>`;
             return `<tr class="gh-row-click" data-action="open-user" data-uid="${esc(u.uid)}">
-                <td><input type="checkbox" class="gh-check" data-action="select" data-scope="users" data-id="${esc(u.uid)}" ${sel('users').has(u.uid) ? 'checked' : ''} aria-label="选择用户 ${esc(u.email || u.uid)}"></td>
+                <td class="gh-cell-select" data-action="select-cell" data-scope="users" data-id="${esc(u.uid)}"><input type="checkbox" class="gh-check" data-action="select" data-scope="users" data-id="${esc(u.uid)}" ${sel('users').has(u.uid) ? 'checked' : ''} aria-label="选择用户 ${esc(u.email || u.uid)}"></td>
                 <td class="gh-cell-strong">${esc(u.email || '—')}</td>
                 <td>${esc(u.name || '未设置')}</td>
                 <td class="gh-mono gh-cell-muted">${shortUid(u.uid)}
@@ -499,7 +551,7 @@
                 <td class="gh-cell-muted gh-nowrap">${fmtDate(u.lastSignInAt)}</td>
                 <td class="gh-cell-strong">${fmtNum(u.siteCount)}</td>
                 <td>${status}</td>
-                <td class="gh-cell-actions">
+                <td class="gh-cell-actions" data-action="actions-cell">
                     <button class="gh-btn gh-btn-sm" data-action="open-user" data-uid="${esc(u.uid)}"><i class="fas fa-arrow-up-right-from-square"></i> 详情</button>
                     ${banBtn}
                     <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" data-count="${fmtNum(u.siteCount)}" title="删除用户"><i class="fas fa-user-times"></i></button>
@@ -569,21 +621,23 @@
                 ['HTML / MD / 项目', `${fmtNum(byType.html)} / ${fmtNum(byType.md)} / ${fmtNum(byType.project)}`],
                 ['累计访问量', fmtNum(sum.totalVisits)],
                 ['最近创建站点', fmtDate(sum.lastCreatedAt)],
-            ]) + `<div class="gh-divider"></div><p class="gh-note">点击站点行可查看详情；右侧「删除」可<b>不进详情页</b>直接删站（先清 Storage 文件，再删记录）。</p>`);
+            ]) + `<div class="gh-divider"></div><p class="gh-note">点站点行看详情；勾选左侧复选框可<b>批量删除</b>，右侧「删除」可单个直接删站（都先清 Storage 文件再删记录）。点复选框所在格子的任意位置都只勾选，不会跳详情页。</p>`);
         html += `</div>`;
 
         const siteRows = (d.sites || []).map(s => `<tr class="gh-row-click" data-action="open-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}">
+            <td class="gh-cell-select" data-action="select-cell" data-scope="sites" data-id="${esc(s.name)}"><input type="checkbox" class="gh-check" data-action="select" data-scope="sites" data-id="${esc(s.name)}" ${sel('sites').has(s.name) ? 'checked' : ''} aria-label="选择站点 ${esc(s.name)}"></td>
             <td class="gh-cell-strong gh-mono">${esc(s.name)}</td>
             <td>${typeBadge(s.type)}</td>
             <td>${fmtNum(s.visitCount)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.createdAt)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.updatedAt)}</td>
-            <td class="gh-cell-actions">
+            <td class="gh-cell-actions" data-action="actions-cell">
                 <button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}"><i class="fas fa-arrow-up-right-from-square"></i> 查看</button>
                 <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}" title="直接删除站点"><i class="fas fa-trash"></i> 删除</button>
             </td></tr>`);
-        html += card('fa-globe', '名下网站', tableHtml(
-            ['站点', '类型', '访问量', '创建时间', '更新时间', ''], siteRows,
+        html += card('fa-globe', '名下网站', selectionBar('sites') + tableHtml(
+            ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="sites" aria-label="全选本页">',
+             '站点', '类型', '访问量', '创建时间', '更新时间', ''], siteRows,
             empty('fa-globe', '该用户还没有创建站点')
         ), `<button class="gh-btn gh-btn-sm" data-action="back" data-to="users"><i class="fas fa-arrow-left"></i> 返回用户列表</button>`);
 
@@ -612,13 +666,13 @@
     }
     function sitesTableHtml(d) {
         const rows = (d.sites || []).map(s => `<tr class="gh-row-click" data-action="open-site" data-slug="${esc(s.name)}">
-            <td><input type="checkbox" class="gh-check" data-action="select" data-scope="sites" data-id="${esc(s.name)}" ${sel('sites').has(s.name) ? 'checked' : ''} aria-label="选择站点 ${esc(s.name)}"></td>
+            <td class="gh-cell-select" data-action="select-cell" data-scope="sites" data-id="${esc(s.name)}"><input type="checkbox" class="gh-check" data-action="select" data-scope="sites" data-id="${esc(s.name)}" ${sel('sites').has(s.name) ? 'checked' : ''} aria-label="选择站点 ${esc(s.name)}"></td>
             <td class="gh-cell-strong gh-mono">${esc(s.name)}</td>
             <td>${typeBadge(s.type)}</td>
             <td><div>${esc(s.ownerEmail || s.ownerId || '—')}</div><div class="gh-cell-muted">${esc(s.ownerName || '')}</div></td>
             <td>${fmtNum(s.visitCount)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.createdAt)}</td>
-            <td class="gh-cell-actions">
+            <td class="gh-cell-actions" data-action="actions-cell">
                 <button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}">详情</button>
                 <a class="gh-btn gh-btn-sm" data-action="external" href="${esc(siteLink(s))}" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square"></i></a>
                 <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-site" data-slug="${esc(s.name)}" title="不进详情页直接删除"><i class="fas fa-trash"></i> 删除</button>
@@ -742,7 +796,7 @@
             <td><div>${esc((x.author && (x.author.nickname || x.author.accountName)) || '—')}</div><div class="gh-cell-muted">${esc(x.author && x.author.email || '')}</div></td>
             <td class="gh-cell-muted">${fmtNum(x.like_count)} / ${fmtNum(x.comment_count)} / ${fmtNum(x.view_count)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(x.created_at)}</td>
-            <td class="gh-cell-actions">
+            <td class="gh-cell-actions" data-action="actions-cell">
                 <button class="gh-btn gh-btn-sm" data-action="play-post-detail" data-id="${esc(x.id)}">详情</button>
                 <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-play-post" data-id="${esc(x.id)}" data-title="${esc(x.title || '')}"><i class="fas fa-trash"></i></button>
             </td></tr>`);
@@ -755,7 +809,7 @@
             <td class="gh-cell-muted gh-ellipsis">${esc(x.post_title || x.post_id || '—')}</td>
             <td>${x.author && x.author.is_ai ? badge('AI 小鹅C', 'warn') : esc((x.author && (x.author.nickname || x.author.email)) || '—')}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(x.created_at)}</td>
-            <td class="gh-cell-actions"><button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-play-comment" data-id="${esc(x.id)}"><i class="fas fa-trash"></i></button></td></tr>`);
+            <td class="gh-cell-actions" data-action="actions-cell"><button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-play-comment" data-id="${esc(x.id)}"><i class="fas fa-trash"></i></button></td></tr>`);
         return tableHtml(['内容', '所属帖子', '作者', '发布时间', ''], rows,
             empty('fa-comment', state.play.q ? '没有匹配的评论' : '暂无评论')) + pagerHtml(d.pagination, 'play');
     }
@@ -890,18 +944,21 @@
             }
             /* ---- 批量选择 ---- */
             case 'select': {
-                const scope = ds.scope, id = ds.id;
-                if (!scope || !state.selection[scope] || !id) break;
-                const set = sel(scope);
-                if (el.checked) {
-                    if (set.size >= BATCH_MAX[scope]) {
-                        el.checked = false;
-                        toast(`单次最多选择 ${BATCH_MAX[scope]} 项`, 'error');
-                    } else set.add(id);
-                } else set.delete(id);
-                updateSelectionUI(scope);
+                // 点 input 本身：浏览器已切换 checked，这里只同步选择集合
+                if (!applySelect(ds.scope, ds.id, !!el.checked)) el.checked = false;
                 break;
             }
+            case 'select-cell': {
+                // 点复选框所在单元格的任意位置（含 input 外的 padding）都算勾选，
+                // 且绝不会冒泡成「行点击 → 跳站点详情」。手抖点偏也不会误跳。
+                const scope = ds.scope, id = ds.id;
+                const cb = el.querySelector ? el.querySelector('input[type="checkbox"]') : null;
+                const next = cb ? !cb.checked : true;
+                if (applySelect(scope, id, next)) { if (cb) cb.checked = next; }
+                else if (cb) cb.checked = false;
+                break;
+            }
+            case 'actions-cell': break;   // 点操作列按钮之间的空白：什么都不做，不跳详情
             case 'select-all': {
                 const scope = ds.scope;
                 if (!scope || !state.selection[scope]) break;
@@ -1164,6 +1221,10 @@
         const el = ev.target.closest('[data-action]');
         if (!el) return;
         const action = el.dataset.action;
+        // 双保险：即使某个 td 忘了标注 data-action，只要命中的是「整行点击」且
+        // 手落在复选框列 / 操作列里，也不跳详情页（按钮自身不受影响）。
+        if ((action === 'open-site' || action === 'open-user') && el.tagName === 'TR' &&
+            ev.target && ev.target.closest && ev.target.closest('.gh-cell-select, .gh-cell-actions')) return;
         // 复选框要保留原生勾选状态；外链要保留浏览器默认跳转
         const keepDefault = action === 'select' || action === 'select-all' || action === 'external';
         if (!keepDefault) ev.preventDefault();

@@ -141,17 +141,32 @@ export async function setUserBanCore(supabase, env, uid, action, duration) {
   };
 }
 
-/** 批量执行：逐项独立，任何一项失败不影响其它项；返回完整报告 */
-export async function runBatch(items, worker) {
-  const results = [];
-  for (const id of items) {
-    try {
-      const extra = await worker(id);
-      results.push({ id, ok: true, ...(extra && typeof extra === 'object' ? extra : {}) });
-    } catch (err) {
-      results.push({ id, ok: false, error: err?.message || String(err) });
+/**
+ * 批量执行：逐项独立，任何一项失败不影响其它项；返回完整报告。
+ * concurrency > 1 时有限并发（删站串行太慢，50 个 project 站可能要几分钟），
+ * 但结果数组仍按输入顺序返回，前端报告的顺序不会乱。
+ * 注意并发会同时放大对 Supabase Storage 的请求数，别调太高。
+ */
+export async function runBatch(items, worker, concurrency = 1) {
+  const total = items.length;
+  const results = new Array(total);
+  const n = Math.max(1, Math.min(Math.floor(concurrency) || 1, total || 1));
+  let cursor = 0;
+
+  async function runner() {
+    while (cursor < total) {
+      const i = cursor++;
+      const id = items[i];
+      try {
+        const extra = await worker(id);
+        results[i] = { id, ok: true, ...(extra && typeof extra === 'object' ? extra : {}) };
+      } catch (err) {
+        results[i] = { id, ok: false, error: err?.message || String(err) };
+      }
     }
   }
+
+  await Promise.all(Array.from({ length: n }, runner));
   const succeeded = results.filter(r => r.ok).length;
-  return { results, succeeded, failed: results.length - succeeded, total: results.length };
+  return { results, succeeded, failed: total - succeeded, total };
 }
