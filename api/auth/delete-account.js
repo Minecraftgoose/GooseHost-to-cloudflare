@@ -4,6 +4,8 @@ import { getUserId, isApiKeyRequest } from '../utils/jwt.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
+import { removeSiteFiles } from '../utils/storage-cleanup.js';
+import { invalidateAdminCache } from '../utils/admin-data.js';
 
 export async function handleDeleteAccount(request, env, corsHeaders) {
   // 销号是不可逆操作：一枚落到 CI 里的 API 密钥不该具备抹掉整个账号的能力。
@@ -23,35 +25,35 @@ export async function handleDeleteAccount(request, env, corsHeaders) {
   try {
     const supabase = makeSupabase(env);
 
+    // 1) 查全部站点（含 type / owner_id，用于反推桶与路径）
     const { data: sites, error: selErr } = await supabase
       .from('gh_site')
-      .select('name, type')
+      .select('owner_id, name, type')
       .eq('owner_id', userId);
     if (selErr) throw selErr;
 
-    const sitesFiles = [];
-    const mdFiles = [];
-    for (const s of (sites || [])) {
-      const isMd = s.type === 'md';
-      if (isMd) {
-        mdFiles.push(`${userId}/${s.name}/index.md`);
-      } else {
-        sitesFiles.push(`${userId}/${s.name}/index.html`);
+    // 2) 先逐站清文件；任一失败立即中止，账号与记录保留，用户可重试
+    for (const site of (sites || [])) {
+      const rmErr = await removeSiteFiles(env, supabase, site);
+      if (rmErr) {
+        console.error('[delete-account] storage remove failed:', site.type, site.name, rmErr.message);
+        return jsonResp({
+          error: `站点「${site.name}」存储清理失败，请重试注销`,
+          partial: true
+        }, 500, corsHeaders);
       }
     }
-    if (sitesFiles.length) {
-      await supabase.storage.from('sites').remove(sitesFiles).catch(() => {});
-    }
-    if (mdFiles.length) {
-      await supabase.storage.from('md').remove(mdFiles).catch(() => {});
+
+    // 3) 文件全部清完，再删 gh_site 记录
+    if (sites?.length) {
+      const { error: delErr } = await supabase
+        .from('gh_site')
+        .delete()
+        .eq('owner_id', userId);
+      if (delErr) throw delErr;
     }
 
-    const { error: delErr } = await supabase
-      .from('gh_site')
-      .delete()
-      .eq('owner_id', userId);
-    if (delErr) throw delErr;
-
+    // 4) 删 auth 用户
     const delRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
       method: 'DELETE',
       headers: {
@@ -65,6 +67,7 @@ export async function handleDeleteAccount(request, env, corsHeaders) {
       throw new Error(errData.msg || '删除用户失败');
     }
 
+    invalidateAdminCache(env);
     return jsonResp({ success: true }, 200, corsHeaders);
   } catch (err) {
     return jsonResp({ error: err.message || '注销失败，请稍后再试' }, 500, corsHeaders);

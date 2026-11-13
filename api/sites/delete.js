@@ -1,9 +1,11 @@
-﻿// ===== 删除站点 =====
+// ===== 删除站点 =====
 
 import { getUserId, isValidSlug } from '../utils/jwt.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
+import { removeSiteFiles } from '../utils/storage-cleanup.js';
+import { invalidateAdminCache } from '../utils/admin-data.js';
 
 export async function handleDelete(request, env, corsHeaders) {
   const userId = await getUserId(request, env);
@@ -28,9 +30,10 @@ export async function handleDelete(request, env, corsHeaders) {
   try {
     const supabase = makeSupabase(env);
 
+    // 查出完整记录：owner_id / name / type 用于反推存储路径，不信任请求体里的 slug
     const { data: site, error: fetchError } = await supabase
       .from('gh_site')
-      .select('owner_id, type')
+      .select('owner_id, name, type')
       .eq('name', actualSlug)
       .eq('owner_id', userId)
       .maybeSingle();
@@ -39,26 +42,23 @@ export async function handleDelete(request, env, corsHeaders) {
       return jsonResp({ error: 'Site not found' }, 404, corsHeaders);
     }
 
+    // ① 先删文件：失败就返回 500，保留 gh_site 让用户重试，不产生孤儿
+    const rmErr = await removeSiteFiles(env, supabase, site);
+    if (rmErr) {
+      console.error('[delete] storage remove failed:', site.type, site.name, rmErr.message);
+      return jsonResp({ error: '存储文件删除失败，请重试' }, 500, corsHeaders);
+    }
+
+    // ② 文件确认删干净，再删数据库记录
     const { error: delError } = await supabase
       .from('gh_site')
       .delete()
-      .eq('name', actualSlug)
+      .eq('name', site.name)
       .eq('owner_id', userId);
 
     if (delError) throw delError;
 
-    const isMarkdown = site.type === 'md';
-    const bucket = isMarkdown ? 'md' : 'sites';
-    const filePath = isMarkdown 
-      ? `${site.owner_id}/${actualSlug}/index.md` 
-      : `${userId}/${actualSlug}/index.html`;
-    
-    try {
-      await supabase.storage.from(bucket).remove([filePath]);
-    } catch (err) {
-      console.error('删除存储文件失败:', err.message);
-    }
-
+    invalidateAdminCache(env);
     return jsonResp({ success: true }, 200, corsHeaders);
   } catch (err) {
     return jsonResp({ error: err.message }, 500, corsHeaders);

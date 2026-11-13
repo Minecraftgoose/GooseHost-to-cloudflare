@@ -25,16 +25,18 @@ import { handleServeSite } from './sites/serve.js';
 import { handleServeProject } from './sites/project.js';
 
 import { handleAdminStats } from './admin/stats.js';
-import { handleAdminUsers } from './admin/users.js';
+import { handleAdminUsers, handleAdminUserDetail } from './admin/users.js';
 import { handleAdminSites } from './admin/sites.js';
 import { handleAdminSiteDetail, handleAdminSiteUpdate } from './admin/site-detail.js';
 import { handleAdminDeleteUser, handleAdminDeleteSite } from './admin/delete-user.js';
+import { handleAdminCleanupOrphans } from './admin/cleanup-orphans.js';
 import { handleAdminSyncEmails } from './admin/sync-emails.js';
-import { handleGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
+import { handleGetAnnouncement, handleAdminGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
 import { handlePublicStats } from './admin/public-stats.js';
 import {
   handleAdminPlayPosts,
   handleAdminPlayComments,
+  handleAdminPlayPostDetail,
   handleAdminDeletePlayPost,
   handleAdminDeletePlayComment,
   handleAdminPlayStats
@@ -262,9 +264,14 @@ export default {
       return await handleAdminStats(request, env, corsHeaders);
     }
 
-    // GET /api/admin/users - 用户列表
+    // GET /api/admin/users - 用户列表（Auth Admin API）
     if (url.pathname === '/api/admin/users' && method === 'GET') {
       return await handleAdminUsers(request, env, corsHeaders);
+    }
+
+    // GET /api/admin/users/:uid - 用户详情（SPA 钻取页：含名下站点）
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'users' && pathParts[3] && !pathParts[4] && method === 'GET') {
+      return await handleAdminUserDetail(request, env, corsHeaders, pathParts[3]);
     }
 
     // GET /api/admin/sites - 站点列表
@@ -292,14 +299,24 @@ export default {
       return await handleAdminDeleteUser(request, env, corsHeaders);
     }
 
-    // DELETE /api/admin/user/:userId - 删除用户
-    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'user' && pathParts[3] && !pathParts[4] && method === 'DELETE') {
-      return await handleAdminDeleteUser(request, env, corsHeaders);
+    // POST /api/admin/cleanup-orphans - 历史孤儿文件清理（默认 dryRun 预览）
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'cleanup-orphans' && !pathParts[3] && method === 'POST') {
+      return await handleAdminCleanupOrphans(request, env, corsHeaders);
     }
 
-    // POST /api/admin/sync-emails - 同步邮箱
+    // DELETE /api/admin/user/:userId - 删除用户（路径参数版）
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'user' && pathParts[3] && !pathParts[4] && method === 'DELETE') {
+      return await handleAdminDeleteUser(request, env, corsHeaders, pathParts[3]);
+    }
+
+    // POST /api/admin/sync-emails - 同步邮箱（兼容旧映射）
     if (url.pathname === '/api/admin/sync-emails' && method === 'POST') {
       return await handleAdminSyncEmails(request, env, corsHeaders);
+    }
+
+    // GET /api/admin/announcement - 当前公告 + 历史
+    if (url.pathname === '/api/admin/announcement' && method === 'GET') {
+      return await handleAdminGetAnnouncement(request, env, corsHeaders);
     }
 
     // POST /api/admin/announcement - 发公告/清公告
@@ -322,6 +339,12 @@ export default {
     // GET /api/admin/play/comments - 广场评论列表
     if (url.pathname === '/api/admin/play/comments' && method === 'GET') {
       return await handleAdminPlayComments(request, env, corsHeaders);
+    }
+
+    // GET /api/admin/play/post/:id - 帖子详情（含评论）
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'play'
+        && pathParts[3] === 'post' && pathParts[4] && !pathParts[5] && method === 'GET') {
+      return await handleAdminPlayPostDetail(request, env, corsHeaders, pathParts[4]);
     }
 
     // DELETE /api/admin/play/post/:id - 删除帖子
