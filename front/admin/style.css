@@ -91,7 +91,7 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
     z-index: 40;
 }
 .gh-brand { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--gh-a-border-soft); }
-.gh-brand img { height: 30px; width: 30px; }
+.gh-brand img { height: 30px; width: 30px; object-fit: contain; flex-shrink: 0; }
 .gh-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 .gh-brand-text strong { font-size: 15px; }
 .gh-brand-text span { font-size: 11px; color: var(--gh-a-muted); }
@@ -194,9 +194,12 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 /* ===== 表格 ===== */
 .gh-table-wrap { overflow-x: auto; }
 .gh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.gh-table th { padding: 10px 14px; text-align: left; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--gh-a-muted); background: var(--gh-a-surface-2); border-bottom: 1px solid var(--gh-a-border-soft); white-space: nowrap; }
-.gh-table th.gh-th-check { width: 38px; padding-right: 0; }
+.gh-table th { box-sizing: border-box; padding: 10px 14px; text-align: left; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--gh-a-muted); background: var(--gh-a-surface-2); border-bottom: 1px solid var(--gh-a-border-soft); white-space: nowrap; }
+/* 每个表头单元格之间留一条可见分隔线：列是否对齐一眼可辨 */
+.gh-table th + th { border-left: 1px solid var(--gh-a-border-soft); }
+.gh-table th.gh-th-check { width: 38px; padding-right: 0; text-align: center; }
 .gh-table th.gh-th-actions { text-align: right; }
+.gh-table col { box-sizing: border-box; }
 .gh-table td { padding: 11px 14px; border-bottom: 1px solid var(--gh-a-border-soft); vertical-align: middle; }
 .gh-table td.gh-cell-select { width: 38px; padding-right: 0; cursor: pointer; }
 .gh-table tbody tr:last-child td { border-bottom: none; }
@@ -223,6 +226,7 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 .gh-batch-count { font-size: 13px; font-weight: 600; color: var(--gh-a-accent); margin-right: 4px; }
 .gh-batch-hint { font-size: 12px; color: var(--gh-a-subtle); }
 .gh-batch-bar:has(.gh-batch-count) { background: var(--gh-a-accent-soft); }
+.gh-build { display: inline-block; margin-top: 6px; opacity: .55; font-size: 10px; letter-spacing: .3px; font-family: monospace; }
 
 .gh-pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--gh-a-border-soft); }
 .gh-page-btn { min-width: 30px; height: 30px; padding: 0 9px; border: 1px solid var(--gh-a-border); background: var(--gh-a-surface); color: var(--gh-a-text); border-radius: var(--gh-r); cursor: pointer; font-size: 12px; }

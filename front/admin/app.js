@@ -139,19 +139,28 @@
         html += `<span class="gh-page-info">第 ${cur}/${pages} 页 · 共 ${fmtNum(p.total)} 条</span></div>`;
         return html;
     }
-    function tableHtml(headers, rows, emptyHtml) {
+    function tableHtml(headers, rows, emptyHtml, colWidths) {
         if (!rows.length) return emptyHtml || empty('fa-inbox', '暂无数据');
-        // 之前 headers.join('') 直接把裸文字塞进 <tr>，浏览器只渲染成一个文本节点，
-        // 于是表头挤成一坨、与 td 列完全对不上。这里统一包成 <th>，并给复选框列/
-        // 操作列专属 class，保证列宽与数据行一致。
-        const ths = headers.map((h, i) => {
-            const text = String(h == null ? '' : h);
-            const isCheck = /<input/i.test(text) || text.indexOf('select-all') >= 0;
-            const isActions = i === headers.length - 1 && text.trim() === '';
-            const cls = isCheck ? 'gh-th-check' : (isActions ? 'gh-th-actions' : '');
-            return `<th${cls ? ` class="${cls}"` : ''}>${text}</th>`;
+        // 表头与数据列必须严格同源对齐：
+        //   · 每个表头单独包 <th scope="col">（旧版 headers.join('') 会挤成一个文本节点）
+        //   · 用 <colgroup> 固定关键列宽，表头和所有 tbody 行共享同一套列定义
+        //   · 纯文本表头走 esc()，含 HTML（全选复选框）的原样输出
+        const widths = Array.isArray(colWidths) ? colWidths : [];
+        const cols = headers.map((_, i) => {
+            const w = String(widths[i] || '').trim();
+            return w ? `<col style="width:${esc(w)}">` : '<col>';
         }).join('');
-        return `<div class="gh-table-wrap"><table class="gh-table"><thead><tr>${ths}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+        const ths = headers.map((h, i) => {
+            const raw = String(h == null ? '' : h);
+            const isHtml = /<[a-z][\s\S]*>/i.test(raw);
+            const text = isHtml ? raw : esc(raw);
+            const isCheck = /<input/i.test(raw) || raw.indexOf('select-all') >= 0;
+            const isActions = i === headers.length - 1 && raw.trim() === '';
+            const cls = isCheck ? 'gh-th-check' : (isActions ? 'gh-th-actions' : '');
+            return `<th scope="col"${cls ? ` class="${cls}"` : ''}>${text}</th>`;
+        }).join('');
+        return `<div class="gh-table-wrap"><table class="gh-table"><colgroup>${cols}</colgroup>` +
+            `<thead><tr>${ths}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
     }
     function siteLink(s) { return s.url || (API_URL + (s.type === 'md' ? '/md/' : s.type === 'project' ? '/p/' : '/s/') + encodeURIComponent(s.name)); }
 
@@ -560,7 +569,8 @@
         return selectionBar('users') + tableHtml(
             ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="users" aria-label="全选本页">',
              '邮箱', '名字', 'UID', '注册时间', '最后登录时间', '站点数', '状态', ''], rows,
-            empty('fa-users', state.users.q ? '没有匹配的用户' : '暂无用户')
+            empty('fa-users', state.users.q ? '没有匹配的用户' : '暂无用户'),
+            ['38px', '', '', '', '150px', '150px', '70px', '90px', '180px']
         ) + pagerHtml(d.pagination, 'users');
     }
     async function renderUsers(token) {
@@ -638,7 +648,8 @@
         html += card('fa-globe', '名下网站', selectionBar('sites') + tableHtml(
             ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="sites" aria-label="全选本页">',
              '站点', '类型', '访问量', '创建时间', '更新时间', ''], siteRows,
-            empty('fa-globe', '该用户还没有创建站点')
+            empty('fa-globe', '该用户还没有创建站点'),
+            ['38px', '', '90px', '80px', '150px', '150px', '160px']
         ), `<button class="gh-btn gh-btn-sm" data-action="back" data-to="users"><i class="fas fa-arrow-left"></i> 返回用户列表</button>`);
 
         view.innerHTML = html;
@@ -680,7 +691,9 @@
         return selectionBar('sites') + tableHtml(
             ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="sites" aria-label="全选本页">',
              '站点', '类型', '所有者', '访问量', '创建时间', ''], rows,
-            empty('fa-globe', state.sites.q ? '没有匹配的站点' : '暂无站点')) + pagerHtml(d.pagination, 'sites');
+            empty('fa-globe', state.sites.q ? '没有匹配的站点' : '暂无站点'),
+            ['38px', '', '90px', '', '80px', '150px', '190px']
+        ) + pagerHtml(d.pagination, 'sites');
     }
     async function renderSites(token) {
         setCrumb([{ text: '站点' }]);
