@@ -21,6 +21,7 @@
 
     const API_URL = 'https://page.goose.cc.cd';
     const PAGE_SIZE = 25;
+    const BATCH_MAX = { users: 25, sites: 50 };   // 与后端 MAX_BATCH_* 对齐
 
     const view = document.getElementById('view');
     const crumbEl = document.getElementById('breadcrumb');
@@ -191,11 +192,13 @@
         tools: { ownerId: '', result: null },
         siteDetail: null,
         userDetail: null,
+        selection: { users: new Set(), sites: new Set() },
     };
     const searchTimers = {};
     let viewToken = 0;
     let pendingConfirm = null;
     let pendingEditorSave = null;
+    let pendingBanIds = [];
 
     function parseRoute() {
         let h = location.hash.replace(/^#\/?/, '');
@@ -311,6 +314,110 @@
     }
 
     /* ------------------------------------------------------------------
+     * 批量选择 / 封禁 / 执行报告
+     * ------------------------------------------------------------------ */
+
+    function sel(scope) { return state.selection[scope]; }
+    function isBanned(u) {
+        return !!(u && u.bannedUntil && Date.parse(u.bannedUntil) > Date.now());
+    }
+    function clearSelection(scope) {
+        if (scope) { sel(scope).clear(); updateSelectionUI(scope); }
+        else { Object.keys(state.selection).forEach(k => { sel(k).clear(); updateSelectionUI(k); }); }
+    }
+    function selectionBarInner(scope) {
+        const ids = [...sel(scope)];
+        if (!ids.length) return `<span class="gh-batch-hint">勾选多行可批量操作（单次最多 ${BATCH_MAX[scope]} 项）</span>`;
+        const userActions = scope === 'users'
+            ? `<button class="gh-btn gh-btn-sm" data-action="batch-ban" data-scope="users"><i class="fas fa-ban"></i> 批量封禁</button>` +
+              `<button class="gh-btn gh-btn-sm" data-action="batch-unban" data-scope="users"><i class="fas fa-lock-open"></i> 批量解封</button>` +
+              `<button class="gh-btn gh-btn-sm gh-btn-danger" data-action="batch-delete-users"><i class="fas fa-user-times"></i> 批量删除用户</button>`
+            : `<button class="gh-btn gh-btn-sm gh-btn-danger" data-action="batch-delete-sites"><i class="fas fa-trash"></i> 批量删除站点</button>`;
+        return `<span class="gh-batch-count">已选 <strong>${ids.length}</strong> 项</span>${userActions}` +
+            `<button class="gh-btn gh-btn-sm gh-btn-link" data-action="clear-selection" data-scope="${esc(scope)}">清空选择</button>`;
+    }
+    function selectionBar(scope) {
+        return `<div class="gh-batch-bar" id="batch-${esc(scope)}">${selectionBarInner(scope)}</div>`;
+    }
+    function updateSelectionUI(scope) {
+        const bar = document.getElementById('batch-' + scope);
+        if (bar) bar.innerHTML = selectionBarInner(scope);
+        // 同步表头「全选」状态：本页可见行是否全部被选中
+        try {
+            const boxes = document.querySelectorAll('input[data-action="select"][data-scope="' + scope + '"]');
+            const all = document.querySelectorAll('input[data-action="select-all"][data-scope="' + scope + '"]');
+            const visible = boxes ? [...boxes] : [];
+            const checkedCount = visible.filter(b => b.checked).length;
+            (all || []).forEach(b => {
+                b.checked = visible.length > 0 && checkedCount === visible.length;
+                b.indeterminate = checkedCount > 0 && checkedCount < visible.length;
+            });
+        } catch (_) { /* 非 DOM 环境（冒烟测试）忽略 */ }
+    }
+    function openBanModal(ids) {
+        pendingBanIds = ids;
+        openModal(
+            `<div class="gh-modal-head"><span>封禁 ${ids.length} 位用户</span>` +
+            `<button class="gh-modal-close" data-action="modal-close"><i class="fas fa-xmark"></i></button></div>` +
+            `<div class="gh-modal-body"><div class="gh-field"><label class="gh-label">封禁时长</label>` +
+            `<select id="banDuration" class="gh-select" style="width:100%">` +
+            `<option value="24h">24 小时</option><option value="168h">7 天</option>` +
+            `<option value="720h">30 天</option><option value="876000h" selected>永久（官方示例：100 年）</option>` +
+            `</select></div>` +
+            `<p class="gh-note" style="margin-top:10px">按 Supabase Auth Admin API 的 <code>updateUserById(uid, { ban_duration })</code> 执行；` +
+            `解封使用 <code>ban_duration: 'none'</code>。封禁会阻止新登录与令牌刷新，` +
+            `已签发的 access token 仍会存活至自身过期（取决于项目 JWT_EXPIRY）。</p></div>` +
+            `<div class="gh-modal-foot"><button class="gh-btn" data-action="modal-close">取消</button>` +
+            `<button class="gh-btn gh-btn-danger" data-action="ban-confirm"><i class="fas fa-ban"></i> 确认封禁</button></div>`
+        );
+    }
+    function showBatchResult(title, d) {
+        const rows = (d.results || []).map(r => `<tr><td class="gh-mono">${esc(r.id)}</td>` +
+            `<td>${r.ok ? badge('成功', 'ok') : badge('失败', 'danger')}</td>` +
+            `<td class="gh-cell-muted">${esc(r.ok ? (r.deletedSites != null ? '删除站点 ' + r.deletedSites : '完成') : r.error || '')}</td></tr>`).join('');
+        openModal(
+            `<div class="gh-modal-head"><span>${esc(title)} · 执行报告</span>` +
+            `<button class="gh-modal-close" data-action="modal-close"><i class="fas fa-xmark"></i></button></div>` +
+            `<div class="gh-modal-body">` +
+            `<div class="gh-kv" style="margin-bottom:12px">` +
+            `<div class="gh-kv-item"><div class="gh-kv-key">总计</div><div class="gh-kv-val">${fmtNum(d.total)}</div></div>` +
+            `<div class="gh-kv-item"><div class="gh-kv-key">成功</div><div class="gh-kv-val">${fmtNum(d.succeeded)}</div></div>` +
+            `<div class="gh-kv-item"><div class="gh-kv-key">失败</div><div class="gh-kv-val">${fmtNum(d.failed)}</div></div>` +
+            `</div>${tableHtml(['ID', '结果', '说明'], [rows].flat().filter(Boolean))}</div>` +
+            `<div class="gh-modal-foot"><button class="gh-btn" data-action="modal-close">关闭</button></div>`, true);
+    }
+    /** 统一执行批量/单项动作：toast + 失败报告 + 清空选择 + 强制刷新 */
+    async function executeAction(cfg) {
+        closeModal();
+        try {
+            const d = await post(cfg.path, cfg.body);
+            const total = d.total || (cfg.body.userIds || cfg.body.siteNames || []).length || 1;
+            const ok = d.success !== false && !d.failed;
+            const succeeded = d.succeeded != null ? d.succeeded : (ok ? total : 0);
+            toast(`${cfg.title}：成功 ${succeeded}/${total}${ok ? '' : '（存在失败项）'}`, ok ? 'success' : 'error');
+            if (!ok && d.results) showBatchResult(cfg.title, d);
+            clearSelection(cfg.scope);
+            forceRefresh = true;
+            await reload();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+    function applyBan(ids, action, duration) {
+        if (!ids.length) return;
+        if (ids.length === 1) {
+            return executeAction({
+                scope: 'users', path: '/api/admin/ban-user',
+                body: { userId: ids[0], action, duration },
+                title: action === 'ban' ? '封禁用户' : '解封用户',
+            });
+        }
+        return executeAction({
+            scope: 'users', path: '/api/admin/batch-users',
+            body: { action, userIds: ids, duration },
+            title: action === 'ban' ? '批量封禁' : '批量解封',
+        });
+    }
+
+    /* ------------------------------------------------------------------
      * 概览
      * ------------------------------------------------------------------ */
 
@@ -376,9 +483,14 @@
     }
     function usersTableHtml(d) {
         const rows = (d.users || []).map(u => {
-            const status = u.bannedUntil ? badge('已封禁', 'danger')
+            const banned = isBanned(u);
+            const status = banned ? badge('已封禁', 'danger')
                 : u.emailConfirmedAt ? badge('正常', 'ok') : badge('未验证邮箱', 'warn');
+            const banBtn = banned
+                ? `<button class="gh-btn gh-btn-sm" data-action="unban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" title="解除封禁"><i class="fas fa-lock-open"></i></button>`
+                : `<button class="gh-btn gh-btn-sm" data-action="ban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" title="封禁用户"><i class="fas fa-ban"></i></button>`;
             return `<tr class="gh-row-click" data-action="open-user" data-uid="${esc(u.uid)}">
+                <td><input type="checkbox" class="gh-check" data-action="select" data-scope="users" data-id="${esc(u.uid)}" ${sel('users').has(u.uid) ? 'checked' : ''} aria-label="选择用户 ${esc(u.email || u.uid)}"></td>
                 <td class="gh-cell-strong">${esc(u.email || '—')}</td>
                 <td>${esc(u.name || '未设置')}</td>
                 <td class="gh-mono gh-cell-muted">${shortUid(u.uid)}
@@ -389,11 +501,13 @@
                 <td>${status}</td>
                 <td class="gh-cell-actions">
                     <button class="gh-btn gh-btn-sm" data-action="open-user" data-uid="${esc(u.uid)}"><i class="fas fa-arrow-up-right-from-square"></i> 详情</button>
-                    <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" data-count="${fmtNum(u.siteCount)}"><i class="fas fa-user-times"></i></button>
+                    ${banBtn}
+                    <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" data-count="${fmtNum(u.siteCount)}" title="删除用户"><i class="fas fa-user-times"></i></button>
                 </td></tr>`;
         });
-        return tableHtml(
-            ['邮箱', '名字', 'UID', '注册时间', '最后登录时间', '站点数', '状态', ''], rows,
+        return selectionBar('users') + tableHtml(
+            ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="users" aria-label="全选本页">',
+             '邮箱', '名字', 'UID', '注册时间', '最后登录时间', '站点数', '状态', ''], rows,
             empty('fa-users', state.users.q ? '没有匹配的用户' : '暂无用户')
         ) + pagerHtml(d.pagination, 'users');
     }
@@ -425,10 +539,15 @@
         const sum = d.summary || {};
         const byType = sum.byType || {};
 
+        const banned = isBanned(u);
+        const banAction = banned
+            ? `<button class="gh-btn" data-action="unban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}"><i class="fas fa-lock-open"></i> 解除封禁</button>`
+            : `<button class="gh-btn" data-action="ban-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}"><i class="fas fa-ban"></i> 封禁用户</button>`;
         let html = pageHead('fa-user', u.name || u.email || '用户详情',
             `${esc(u.email || '—')} · <span class="gh-mono">${esc(u.uid)}</span>`,
             `<button class="gh-btn" data-action="copy" data-copy="${esc(u.uid)}"><i class="fas fa-copy"></i> 复制 UID</button>` +
             `<button class="gh-btn" data-action="back" data-to="users"><i class="fas fa-arrow-left"></i> 用户列表</button>` +
+            banAction +
             `<button class="gh-btn gh-btn-danger" data-action="delete-user" data-uid="${esc(u.uid)}" data-email="${esc(u.email)}" data-count="${fmtNum(sum.siteCount)}"><i class="fas fa-user-times"></i> 删除用户</button>`);
 
         html += `<div class="gh-grid gh-grid-2">`;
@@ -442,7 +561,7 @@
             ['账号更新时间', fmtDate(u.updatedAt)],
             ['登录方式', esc((u.providers || []).join(', ') || u.provider || '—')],
             ['账号类型', u.isAnonymous ? badge('匿名用户', 'warn') : badge('正式用户', 'ok')],
-            ['封禁状态', u.bannedUntil ? badge('封禁至 ' + fmtDate(u.bannedUntil), 'danger') : badge('正常', 'ok')],
+            ['封禁状态', banned ? badge('封禁至 ' + fmtDate(u.bannedUntil), 'danger') : badge('正常', 'ok')],
         ]));
         html += cardPadded('fa-chart-simple', '名下站点概况',
             kv([
@@ -450,7 +569,7 @@
                 ['HTML / MD / 项目', `${fmtNum(byType.html)} / ${fmtNum(byType.md)} / ${fmtNum(byType.project)}`],
                 ['累计访问量', fmtNum(sum.totalVisits)],
                 ['最近创建站点', fmtDate(sum.lastCreatedAt)],
-            ]) + `<div class="gh-divider"></div><p class="gh-note">点击下表中的站点可继续查看站点详情；所有删除操作都会先清理 Storage 文件再删记录。</p>`);
+            ]) + `<div class="gh-divider"></div><p class="gh-note">点击站点行可查看详情；右侧「删除」可<b>不进详情页</b>直接删站（先清 Storage 文件，再删记录）。</p>`);
         html += `</div>`;
 
         const siteRows = (d.sites || []).map(s => `<tr class="gh-row-click" data-action="open-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}">
@@ -459,7 +578,10 @@
             <td>${fmtNum(s.visitCount)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.createdAt)}</td>
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.updatedAt)}</td>
-            <td class="gh-cell-actions"><button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}"><i class="fas fa-arrow-up-right-from-square"></i> 查看</button></td></tr>`);
+            <td class="gh-cell-actions">
+                <button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}"><i class="fas fa-arrow-up-right-from-square"></i> 查看</button>
+                <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-site" data-slug="${esc(s.name)}" data-from="${esc(u.uid)}" title="直接删除站点"><i class="fas fa-trash"></i> 删除</button>
+            </td></tr>`);
         html += card('fa-globe', '名下网站', tableHtml(
             ['站点', '类型', '访问量', '创建时间', '更新时间', ''], siteRows,
             empty('fa-globe', '该用户还没有创建站点')
@@ -490,6 +612,7 @@
     }
     function sitesTableHtml(d) {
         const rows = (d.sites || []).map(s => `<tr class="gh-row-click" data-action="open-site" data-slug="${esc(s.name)}">
+            <td><input type="checkbox" class="gh-check" data-action="select" data-scope="sites" data-id="${esc(s.name)}" ${sel('sites').has(s.name) ? 'checked' : ''} aria-label="选择站点 ${esc(s.name)}"></td>
             <td class="gh-cell-strong gh-mono">${esc(s.name)}</td>
             <td>${typeBadge(s.type)}</td>
             <td><div>${esc(s.ownerEmail || s.ownerId || '—')}</div><div class="gh-cell-muted">${esc(s.ownerName || '')}</div></td>
@@ -497,10 +620,12 @@
             <td class="gh-cell-muted gh-nowrap">${fmtDate(s.createdAt)}</td>
             <td class="gh-cell-actions">
                 <button class="gh-btn gh-btn-sm" data-action="open-site" data-slug="${esc(s.name)}">详情</button>
-                <a class="gh-btn gh-btn-sm" href="${esc(siteLink(s))}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fas fa-arrow-up-right-from-square"></i></a>
-                <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-site" data-slug="${esc(s.name)}"><i class="fas fa-trash"></i></button>
+                <a class="gh-btn gh-btn-sm" data-action="external" href="${esc(siteLink(s))}" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                <button class="gh-btn gh-btn-sm gh-btn-danger" data-action="delete-site" data-slug="${esc(s.name)}" title="不进详情页直接删除"><i class="fas fa-trash"></i> 删除</button>
             </td></tr>`);
-        return tableHtml(['站点', '类型', '所有者', '访问量', '创建时间', ''], rows,
+        return selectionBar('sites') + tableHtml(
+            ['<input type="checkbox" class="gh-check" data-action="select-all" data-scope="sites" aria-label="全选本页">',
+             '站点', '类型', '所有者', '访问量', '创建时间', ''], rows,
             empty('fa-globe', state.sites.q ? '没有匹配的站点' : '暂无站点')) + pagerHtml(d.pagination, 'sites');
     }
     async function renderSites(token) {
@@ -743,14 +868,118 @@
                 catch (_) { toast('复制失败，请手动选中文本', 'error'); }
                 break;
             }
+            case 'external': break;   // 外链：保留浏览器默认行为
             case 'page': {
                 const scope = ds.scope;
-                if (state[scope]) { state[scope].page = Math.max(1, parseInt(ds.page) || 1); await reload(); view.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+                if (state[scope]) {
+                    state[scope].page = Math.max(1, parseInt(ds.page) || 1);
+                    if (scope === 'users' || scope === 'sites') clearSelection(scope);
+                    await reload(); view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
                 break;
             }
             case 'toggle-dir': {
                 const scope = ds.scope;
-                if (state[scope]) { state[scope].dir = state[scope].dir === 'asc' ? 'desc' : 'asc'; state[scope].page = 1; await reload(); }
+                if (state[scope]) {
+                    state[scope].dir = state[scope].dir === 'asc' ? 'desc' : 'asc';
+                    state[scope].page = 1;
+                    if (scope === 'users' || scope === 'sites') clearSelection(scope);
+                    await reload();
+                }
+                break;
+            }
+            /* ---- 批量选择 ---- */
+            case 'select': {
+                const scope = ds.scope, id = ds.id;
+                if (!scope || !state.selection[scope] || !id) break;
+                const set = sel(scope);
+                if (el.checked) {
+                    if (set.size >= BATCH_MAX[scope]) {
+                        el.checked = false;
+                        toast(`单次最多选择 ${BATCH_MAX[scope]} 项`, 'error');
+                    } else set.add(id);
+                } else set.delete(id);
+                updateSelectionUI(scope);
+                break;
+            }
+            case 'select-all': {
+                const scope = ds.scope;
+                if (!scope || !state.selection[scope]) break;
+                const boxes = document.querySelectorAll('input[data-action="select"][data-scope="' + scope + '"]') || [];
+                const set = sel(scope);
+                [...boxes].forEach(cb => {
+                    const id = cb.dataset && cb.dataset.id;
+                    if (!id) return;
+                    if (el.checked && set.size < BATCH_MAX[scope]) { cb.checked = true; set.add(id); }
+                    else { cb.checked = false; set.delete(id); }
+                });
+                if (el.checked && set.size >= BATCH_MAX[scope]) toast(`单次最多选择 ${BATCH_MAX[scope]} 项`, 'error');
+                updateSelectionUI(scope);
+                break;
+            }
+            case 'clear-selection': clearSelection(ds.scope); break;
+            case 'batch-delete-users': {
+                const ids = [...sel('users')];
+                confirmAction({
+                    title: '批量删除用户',
+                    message: `确定删除选中的 ${ids.length} 位用户吗？每位用户的站点文件会先被清理，再删站点记录与 Auth 账号。`,
+                    note: '不可恢复。当前登录的管理员账号会被后端跳过；逐项失败会在报告中列出，不影响其它项。',
+                    confirmText: '确认批量删除',
+                    onConfirm: () => executeAction({
+                        scope: 'users', path: '/api/admin/batch-users',
+                        body: { action: 'delete', userIds: ids }, title: '批量删除用户',
+                    }),
+                });
+                break;
+            }
+            case 'batch-delete-sites': {
+                const names = [...sel('sites')];
+                confirmAction({
+                    title: '批量删除站点',
+                    message: `确定删除选中的 ${names.length} 个站点吗？`,
+                    note: '每个站点都先删 Storage 文件再删记录；单项失败不影响其它项，结果会逐条展示。',
+                    confirmText: '确认批量删除',
+                    onConfirm: () => executeAction({
+                        scope: 'sites', path: '/api/admin/batch-sites',
+                        body: { siteNames: names }, title: '批量删除站点',
+                    }),
+                });
+                break;
+            }
+            case 'batch-ban': {
+                const ids = [...sel('users')];
+                if (ids.length) openBanModal(ids);
+                break;
+            }
+            case 'batch-unban': {
+                const ids = [...sel('users')];
+                confirmAction({
+                    title: '批量解封',
+                    message: `确定解除选中的 ${ids.length} 位用户的封禁吗？`,
+                    confirmText: '确认解封', danger: false,
+                    onConfirm: () => applyBan(ids, 'unban', 'none'),
+                });
+                break;
+            }
+            case 'ban-confirm': {
+                const selEl = document.getElementById('banDuration');
+                const duration = selEl ? selEl.value : '876000h';
+                await applyBan(pendingBanIds.slice(), 'ban', duration);
+                break;
+            }
+            case 'ban-user': {
+                pendingBanIds = [ds.uid];
+                openBanModal([ds.uid]);
+                break;
+            }
+            case 'unban-user': {
+                const uid = ds.uid, email = ds.email || uid;
+                confirmAction({
+                    title: '解除封禁',
+                    message: `确定解除用户 ${email} 的封禁吗？`,
+                    confirmText: '确认解封', danger: false,
+                    onConfirm: () => applyBan([uid], 'unban', 'none'),
+                });
                 break;
             }
             case 'delete-user': {
@@ -766,12 +995,13 @@
             }
             case 'delete-site': {
                 const slug = ds.slug;
+                const backTo = ds.from ? 'users/' + encodeURIComponent(ds.from) : 'sites';
                 confirmAction({
                     title: '删除站点',
                     message: `确定删除站点「${slug}」吗？`,
                     note: '会先删除 sites / md / projects 桶里对应文件，再删 gh_site 记录；清理失败时记录保留。',
                     confirmText: '删除站点',
-                    onConfirm: () => afterWrite(() => post('/api/admin/delete-site', { siteName: slug }), '站点已删除', 'sites'),
+                    onConfirm: () => afterWrite(() => post('/api/admin/delete-site', { siteName: slug }), '站点已删除', backTo),
                 });
                 break;
             }
@@ -933,10 +1163,13 @@
         if (ev.target === overlay) { closeModal(); return; }
         const el = ev.target.closest('[data-action]');
         if (!el) return;
-        ev.preventDefault();
-        const btn = el.closest('button');
+        const action = el.dataset.action;
+        // 复选框要保留原生勾选状态；外链要保留浏览器默认跳转
+        const keepDefault = action === 'select' || action === 'select-all' || action === 'external';
+        if (!keepDefault) ev.preventDefault();
+        const btn = el.closest && el.closest('button');
         if (btn && btn.disabled) return;
-        try { await handleAction(el.dataset.action, el, ev); }
+        try { await handleAction(action, el, ev); }
         catch (e) { console.error('[admin] action failed:', e); toast(e.message, 'error'); }
     });
 
@@ -947,6 +1180,8 @@
         const val = t.value;
         clearTimeout(searchTimers[scope]);
         searchTimers[scope] = setTimeout(async () => {
+            // 换筛选条件时清空选择，避免误删已经不在视野里的行
+            if (scope === 'users' || scope === 'sites') clearSelection(scope);
             if (scope === 'users') { state.users.q = val.trim(); state.users.page = 1; await withFocus(() => renderUsers(currentToken())); }
             else if (scope === 'sites') { state.sites.q = val.trim(); state.sites.page = 1; await withFocus(() => renderSites(currentToken())); }
             else if (scope === 'play') { state.play.q = val.trim(); state.play.page = 1; await withFocus(() => renderPlay(currentToken())); }
@@ -957,9 +1192,9 @@
         const t = ev.target;
         if (!t || !t.dataset || !t.dataset.filter) return;
         const f = t.dataset.filter;
-        if (f === 'users-sort') { state.users.sort = t.value; state.users.page = 1; reload(); }
-        else if (f === 'sites-type') { state.sites.type = t.value; state.sites.page = 1; reload(); }
-        else if (f === 'sites-order') { state.sites.order = t.value; state.sites.page = 1; reload(); }
+        if (f === 'users-sort') { clearSelection('users'); state.users.sort = t.value; state.users.page = 1; reload(); }
+        else if (f === 'sites-type') { clearSelection('sites'); state.sites.type = t.value; state.sites.page = 1; reload(); }
+        else if (f === 'sites-order') { clearSelection('sites'); state.sites.order = t.value; state.sites.page = 1; reload(); }
         else if (f === 'orphan-owner') { state.tools.ownerId = t.value.trim(); }
     });
 

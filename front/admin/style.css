@@ -207,6 +207,18 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 .gh-sort { cursor: pointer; user-select: none; }
 .gh-sort i { margin-left: 4px; font-size: 10px; color: var(--gh-a-subtle); }
 
+/* ===== 批量选择 ===== */
+.gh-check { width: 15px; height: 15px; accent-color: var(--gh-a-accent); cursor: pointer; vertical-align: middle; }
+.gh-batch-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 16px;
+    background: var(--gh-a-surface-2);
+    border-bottom: 1px solid var(--gh-a-border-soft);
+}
+.gh-batch-count { font-size: 13px; font-weight: 600; color: var(--gh-a-accent); margin-right: 4px; }
+.gh-batch-hint { font-size: 12px; color: var(--gh-a-subtle); }
+.gh-batch-bar:has(.gh-batch-count) { background: var(--gh-a-accent-soft); }
+
 .gh-pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--gh-a-border-soft); }
 .gh-page-btn { min-width: 30px; height: 30px; padding: 0 9px; border: 1px solid var(--gh-a-border); background: var(--gh-a-surface); color: var(--gh-a-text); border-radius: var(--gh-r); cursor: pointer; font-size: 12px; }
 .gh-page-btn:hover:not(:disabled):not(.active) { background: var(--gh-a-surface-2); }

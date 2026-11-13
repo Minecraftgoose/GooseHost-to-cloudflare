@@ -18,7 +18,7 @@
 // 注意：user_metadata 由用户可自行修改，文档明确要求「不得用于安全敏感上下文」。
 // 这里只把它用于展示昵称，管理员判定依然完全依赖 isAdmin()（ADMIN_USER_IDS）。
 
-import { isAdmin } from './jwt.js';
+import { isAdmin, getUserId } from './jwt.js';
 import { jsonResp } from './response.js';
 import { getPublicBaseUrl } from './site-url.js';
 
@@ -60,6 +60,20 @@ export async function requireAdmin(request, env, corsHeaders) {
     return jsonResp({ error: 'Admin only' }, 403, corsHeaders);
   }
   return null;
+}
+
+/**
+ * 管理员鉴权 + 返回当前操作者 UID。
+ * 用于「禁止封禁/删除当前管理员自己」这类自保校验，只解析一次会话，
+ * 避免 isAdmin() 与 getUserId() 各发一次 /auth/v1/user。
+ */
+export async function requireAdminContext(request, env, corsHeaders) {
+  const adminId = await getUserId(request, env);
+  const adminIds = (env?.ADMIN_USER_IDS || '').split(',').filter(Boolean);
+  if (!adminId || !adminIds.includes(adminId)) {
+    return { denied: jsonResp({ error: 'Admin only' }, 403, corsHeaders), adminId: null };
+  }
+  return { denied: null, adminId };
 }
 
 /** URL 查询参数 → 分页（page 从 1 开始，也兼容 offset） */

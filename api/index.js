@@ -29,6 +29,7 @@ import { handleAdminUsers, handleAdminUserDetail } from './admin/users.js';
 import { handleAdminSites } from './admin/sites.js';
 import { handleAdminSiteDetail, handleAdminSiteUpdate } from './admin/site-detail.js';
 import { handleAdminDeleteUser, handleAdminDeleteSite } from './admin/delete-user.js';
+import { handleAdminBanUser, handleAdminBatchUsers, handleAdminBatchSites } from './admin/batch.js';
 import { handleAdminCleanupOrphans } from './admin/cleanup-orphans.js';
 import { handleAdminSyncEmails } from './admin/sync-emails.js';
 import { handleGetAnnouncement, handleAdminGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
@@ -297,6 +298,21 @@ export default {
     // POST /api/admin/delete-user - 删除用户
     if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'delete-user' && !pathParts[3] && method === 'POST') {
       return await handleAdminDeleteUser(request, env, corsHeaders);
+    }
+
+    // POST /api/admin/ban-user - 封禁 / 解封单个用户（Auth Admin updateUserById）
+    if (url.pathname === '/api/admin/ban-user' && method === 'POST') {
+      return await handleAdminBanUser(request, env, corsHeaders);
+    }
+
+    // POST /api/admin/batch-users - 批量封禁 / 解封 / 删除用户
+    if (url.pathname === '/api/admin/batch-users' && method === 'POST') {
+      return await handleAdminBatchUsers(request, env, corsHeaders);
+    }
+
+    // POST /api/admin/batch-sites - 批量删除站点（列表行内可直接删，不必进详情）
+    if (url.pathname === '/api/admin/batch-sites' && method === 'POST') {
+      return await handleAdminBatchSites(request, env, corsHeaders);
     }
 
     // POST /api/admin/cleanup-orphans - 历史孤儿文件清理（默认 dryRun 预览）

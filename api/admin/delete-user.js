@@ -1,140 +1,57 @@
 // ===== 管理员 - 删除用户及站点 =====
+//
+// 具体动作已抽到 api/utils/admin-actions.js，单项接口与批量接口共用同一份实现，
+// 不会再出现「列表删一套、批量删另一套」的分叉。
+// 新增自保：禁止删除当前登录的管理员账号。
 
-import { isAdmin } from '../utils/jwt.js';
-import { makeSupabase } from '../utils/supabase.js';
-import { fetchEmailMap, saveEmailMap } from '../utils/email-map.js';
 import { jsonResp } from '../utils/response.js';
-import { removeSiteFiles } from '../utils/storage-cleanup.js';
-import { invalidateAdminCache } from '../utils/admin-data.js';
+import { requireAdminContext, UUID_RE } from '../utils/admin-data.js';
+import { deleteSiteCore, deleteUserCore } from '../utils/admin-actions.js';
+
+const SELF_BLOCK = '不能删除当前登录的管理员账号';
 
 // 删除单个站点（管理员）
 export async function handleAdminDeleteSite(request, env, corsHeaders) {
-  if (!await isAdmin(request, env)) {
-    return jsonResp({ error: 'Admin only' }, 403, corsHeaders);
-  }
+  const { denied } = await requireAdminContext(request, env, corsHeaders);
+  if (denied) return denied;
 
-  let siteName;
-  try {
-    const body = await request.json();
-    siteName = body?.siteName || body?.slug || '';
-  } catch {
-    return jsonResp({ error: 'Invalid JSON body' }, 400, corsHeaders);
+  let body;
+  try { body = await request.json(); } catch {
+    return jsonResp({ error: '请求体无效' }, 400, corsHeaders);
   }
+  const siteName = String(body?.siteName || body?.slug || '').trim();
   if (!siteName) return jsonResp({ error: 'Missing siteName' }, 400, corsHeaders);
 
   try {
-    const supabase = makeSupabase(env);
-
-    const { data: site, error: fetchError } = await supabase
-      .from('gh_site')
-      .select('owner_id, name, type')
-      .eq('name', siteName)
-      .maybeSingle();
-
-    if (fetchError || !site) {
-      return jsonResp({ error: '站点不存在' }, 404, corsHeaders);
-    }
-
-    // 先删文件，失败则保留记录可重试
-    const rmErr = await removeSiteFiles(env, supabase, site);
-    if (rmErr) {
-      console.error('[admin-delete-site] storage remove failed:', site.type, site.name, rmErr.message);
-      return jsonResp({ error: '存储文件删除失败，请重试' }, 500, corsHeaders);
-    }
-
-    // 再删记录
-    const { error: delError } = await supabase
-      .from('gh_site')
-      .delete()
-      .eq('name', site.name);
-
-    if (delError) throw delError;
-
-    invalidateAdminCache(env);
-    return jsonResp({ success: true }, 200, corsHeaders);
+    const { makeSupabase } = await import('../utils/supabase.js');
+    const r = await deleteSiteCore(makeSupabase(env), env, siteName);
+    return jsonResp({ success: true, ...r }, 200, corsHeaders);
   } catch (err) {
-    return jsonResp({ error: err.message }, 500, corsHeaders);
+    console.error('[admin-delete-site] failed:', siteName, err.message);
+    return jsonResp({ error: err.message }, err.status || 500, corsHeaders);
   }
 }
 
 // 删除用户及其全部站点（管理员）
+// POST 走 body.userId，DELETE /api/admin/user/:userId 走路径参数
 export async function handleAdminDeleteUser(request, env, corsHeaders, fallbackUserId) {
-  if (!await isAdmin(request, env)) {
-    return jsonResp({ error: 'Admin only' }, 403, corsHeaders);
-  }
+  const { denied, adminId } = await requireAdminContext(request, env, corsHeaders);
+  if (denied) return denied;
 
-  // POST 走 body.userId，DELETE /api/admin/user/:userId 走路径参数
-  // （旧实现两者共用 handler 但只认 body，DELETE 路由永远 400）
   let body = null;
   try { body = await request.json(); } catch { /* 允许无 body 的 DELETE */ }
-  const targetUserId = body?.userId || fallbackUserId || '';
+  const targetUserId = String(body?.userId || fallbackUserId || '').trim();
 
   if (!targetUserId) return jsonResp({ error: 'Missing userId' }, 400, corsHeaders);
-
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetUserId)) {
-    return jsonResp({ error: '无效的用户ID格式' }, 400, corsHeaders);
-  }
+  if (!UUID_RE.test(targetUserId)) return jsonResp({ error: '无效的用户ID格式' }, 400, corsHeaders);
+  if (targetUserId === adminId) return jsonResp({ error: SELF_BLOCK }, 403, corsHeaders);
 
   try {
-    const supabase = makeSupabase(env);
-
-    // 1) 查全部站点（含 type / owner_id，用于反推桶与路径）
-    const { data: sites, error: fetchError } = await supabase
-      .from('gh_site')
-      .select('owner_id, name, type')
-      .eq('owner_id', targetUserId);
-
-    if (fetchError) {
-      console.error('[admin-delete-user] 查询站点失败:', fetchError.message);
-      return jsonResp({ error: '查询用户站点失败，请重试' }, 500, corsHeaders);
-    }
-
-    // 2) 先逐站清文件；任一失败立即中止，不删记录、不删账号
-    for (const site of (sites || [])) {
-      const rmErr = await removeSiteFiles(env, supabase, site);
-      if (rmErr) {
-        console.error('[admin-delete-user] storage remove failed:', site.type, site.name, rmErr.message);
-        return jsonResp({
-          error: `站点「${site.name}」存储清理失败，请重试`,
-          partial: true
-        }, 500, corsHeaders);
-      }
-    }
-
-    // 3) 文件全部清完，再删 gh_site 记录
-    if (sites?.length) {
-      const { error: delErr } = await supabase
-        .from('gh_site')
-        .delete()
-        .eq('owner_id', targetUserId);
-      if (delErr) throw delErr;
-    }
-
-    // 4) 删 auth 用户
-    const { error: authError } = await supabase.auth.admin.deleteUser(targetUserId);
-    if (authError) {
-      console.error('[admin-delete-user] 删除 Auth 用户失败:', authError.message);
-      return jsonResp({ error: '删除 Auth 用户失败: ' + authError.message }, 500, corsHeaders);
-    }
-
-    // 5) 同步 email 映射
-    try {
-      const map = await fetchEmailMap(env);
-      if (map[targetUserId]) {
-        delete map[targetUserId];
-        await saveEmailMap(env, map);
-      }
-    } catch (err) {
-      console.error('[admin-delete-user] 更新邮箱映射失败:', err.message);
-    }
-
-    invalidateAdminCache(env);
-    return jsonResp({
-      success: true,
-      deletedSites: sites?.length || 0,
-      userId: targetUserId
-    }, 200, corsHeaders);
+    const { makeSupabase } = await import('../utils/supabase.js');
+    const r = await deleteUserCore(makeSupabase(env), env, targetUserId);
+    return jsonResp({ success: true, userId: targetUserId, ...r }, 200, corsHeaders);
   } catch (err) {
-    return jsonResp({ error: err.message }, 500, corsHeaders);
+    console.error('[admin-delete-user] failed:', targetUserId, err.message);
+    return jsonResp({ error: err.message, partial: true }, err.status || 500, corsHeaders);
   }
 }
