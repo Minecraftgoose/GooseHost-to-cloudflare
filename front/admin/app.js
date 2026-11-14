@@ -446,16 +446,62 @@
             `</div>${tableHtml(['ID', '结果', '说明'], [rows].flat().filter(Boolean))}</div>` +
             `<div class="gh-modal-foot"><button class="gh-btn" data-action="modal-close">关闭</button></div>`, true);
     }
+    /**
+     * Workers 单次请求的子请求有上限：把过大的批量拆成多次 HTTP 请求，
+     * 每个请求各自有独立配额；报告合并后一次展示，用户无感。
+     * 删用户 ~8 次子请求/项 → 5；删站 ~4 次/项 → 10；封禁 1 次/项 → 25。
+     */
+    function splitBatchBody(body) {
+        const key = Array.isArray(body && body.userIds) ? 'userIds'
+            : (Array.isArray(body && body.siteNames) ? 'siteNames' : null);
+        if (!key) return { key: null, chunks: [body] };
+        const size = key === 'userIds' ? (body.action === 'delete' ? 5 : 25) : 10;
+        if (body[key].length <= size) return { key: key, chunks: [body] };
+        const chunks = [];
+        for (let i = 0; i < body[key].length; i += size) {
+            const part = Object.assign({}, body);
+            part[key] = body[key].slice(i, i + size);
+            chunks.push(part);
+        }
+        return { key: key, chunks: chunks };
+    }
+    function mergeBatchReport(a, b) {
+        if (!a) return b;
+        const out = Object.assign({}, a, b);
+        out.total = (a.total || 0) + (b.total || 0);
+        out.succeeded = (a.succeeded || 0) + (b.succeeded || 0);
+        out.failed = (a.failed || 0) + (b.failed || 0);
+        out.results = (a.results || []).concat(b.results || []);
+        return out;
+    }
     /** 统一执行批量/单项动作：toast + 失败报告 + 清空选择 + 强制刷新 */
     async function executeAction(cfg) {
         closeModal();
+        const split = splitBatchBody(cfg.body);
+        let merged = null;
+        let timeoutErr = null;
         try {
-            const d = await post(cfg.path, cfg.body);
-            const total = d.total || (cfg.body.userIds || cfg.body.siteNames || []).length || 1;
-            const ok = d.success !== false && !d.failed;
-            const succeeded = d.succeeded != null ? d.succeeded : (ok ? total : 0);
-            toast(`${cfg.title}：成功 ${succeeded}/${total}${ok ? '' : '（存在失败项）'}`, ok ? 'success' : 'error');
-            if (!ok && d.results) showBatchResult(cfg.title, d);
+            for (const chunkBody of split.chunks) {
+                let d;
+                try {
+                    d = await post(cfg.path, chunkBody);
+                } catch (e) {
+                    if (e && e.isTimeout) { timeoutErr = e; continue; }
+                    const ids = split.key ? chunkBody[split.key] : [];
+                    d = {
+                        success: false, total: ids.length, succeeded: 0, failed: ids.length,
+                        results: ids.map(function (id) { return { id: id, ok: false, error: e.message }; }),
+                    };
+                }
+                merged = mergeBatchReport(merged, d);
+            }
+            if (timeoutErr) { await recoverFromTimeout(cfg.title); return; }
+            const total = merged.total || (cfg.body.userIds || cfg.body.siteNames || []).length || 1;
+            const ok = merged.success !== false && !merged.failed;
+            const succeeded = merged.succeeded != null ? merged.succeeded : (ok ? total : 0);
+            const chunkNote = split.chunks.length > 1 ? `（分 ${split.chunks.length} 批执行）` : '';
+            toast(`${cfg.title}：成功 ${succeeded}/${total}${chunkNote}${ok ? '' : '（存在失败项）'}`, ok ? 'success' : 'error');
+            if (!ok && merged.results) showBatchResult(cfg.title, merged);
             clearSelection(cfg.scope);
             forceRefresh = true;
             await reload();

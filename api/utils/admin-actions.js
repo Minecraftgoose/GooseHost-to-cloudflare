@@ -15,14 +15,20 @@
 
 import { UUID_RE } from './admin-data.js';
 // 后台读接口已无 Worker 端缓存（全部实时查库），写操作不需要再 invalidate。
-import { removeSiteFiles } from './storage-cleanup.js';
+import { removeSiteFiles, removeSitesFiles } from './storage-cleanup.js';
 
 /** 允许的封禁时长白名单（禁止任意字符串传给 GoTrue） */
 export const BAN_DURATIONS = Object.freeze(['1h', '24h', '168h', '720h', '876000h']);
 export const DEFAULT_BAN_DURATION = '876000h';
 
-export const MAX_BATCH_USERS = 25;   // 与后台每页条数一致
-export const MAX_BATCH_SITES = 50;
+// Cloudflare Workers 单次请求的子请求上限（免费版 50）。按最坏路径估算：
+//   删 1 个用户 ≈ 查站点 1 + Storage RPC 1 + 分桶 remove 3 + 删记录 1
+//                + 删 Auth 1 + email-map 1 = 8 次，再加鉴权/限流 ~3 次。
+//   删 1 个站点 ≈ 查站点 1 + Storage RPC 1 + remove 1 + 删记录 1 = 4 次。
+// 5 个用户 ≈ 40+3、10 个站点 ≈ 40+3，都留有余量。前端会把更大的选择自动分块。
+export const MAX_BATCH_USERS = 5;      // 删除用户（每用户 ~8 次子请求）
+export const MAX_BATCH_BAN_USERS = 25; // 封禁/解封：每个用户仅 1 次 Auth 调用
+export const MAX_BATCH_SITES = 10;
 
 export function normalizeBanDuration(v) {
   return BAN_DURATIONS.includes(String(v || '')) ? String(v) : DEFAULT_BAN_DURATION;
@@ -77,8 +83,11 @@ export async function deleteSiteCore(supabase, env, siteName) {
 }
 
 /**
- * 删除用户及其全部站点：逐站先清文件 → 删 gh_site → 删 Auth 用户 → 同步旧邮箱映射。
+ * 删除用户及其全部站点：一次性批量清文件 → 删 gh_site → 删 Auth 用户 → 同步旧邮箱映射。
  * 任一步失败即抛 Error，此时 gh_site 与 Auth 账号都还在，可重试。
+ *
+ * Storage 侧走 removeSitesFiles：project 前缀合并成一次 multi RPC，
+ * 三个桶各自最多一次批量 remove，请求数与「该用户有多少个站点」无关。
  */
 export async function deleteUserCore(supabase, env, targetUserId) {
   const { data: sites, error: fetchError } = await supabase
@@ -87,9 +96,9 @@ export async function deleteUserCore(supabase, env, targetUserId) {
     .eq('owner_id', targetUserId);
   if (fetchError) throw new Error('查询用户站点失败：' + fetchError.message);
 
-  for (const site of (sites || [])) {
-    const rmErr = await removeSiteFiles(env, supabase, site);
-    if (rmErr) throw new Error(`站点「${site.name}」存储清理失败：${rmErr.message}`);
+  if (sites?.length) {
+    const rmErr = await removeSitesFiles(env, supabase, sites);
+    if (rmErr) throw new Error(`该用户站点存储清理失败：${rmErr.message}`);
   }
 
   if (sites?.length) {
@@ -103,8 +112,9 @@ export async function deleteUserCore(supabase, env, targetUserId) {
   const { error: authError } = await supabase.auth.admin.deleteUser(targetUserId);
   if (authError) throw new Error('删除 Auth 用户失败：' + authError.message);
 
-  // 兼容旧版 admin/email-map.json；这里动态导入，避免工具模块被测试环境
-  // 拉进 @supabase/supabase-js 依赖链。失败只记日志，不影响删除结果。
+  // 兼容旧版 admin/email-map.json；动态导入，且 email-map.js 已内联 URL 拼接、
+  // 不再 import supabase.js，因此不会把 @supabase/supabase-js 拖进删除链路。
+  // 失败只记日志，不影响删除结果。
   try {
     const { fetchEmailMap, saveEmailMap } = await import('./email-map.js');
     const map = await fetchEmailMap(env);

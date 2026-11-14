@@ -4,7 +4,7 @@ import { getUserId, isApiKeyRequest } from '../utils/jwt.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
-import { removeSiteFiles } from '../utils/storage-cleanup.js';
+import { removeSitesFiles } from '../utils/storage-cleanup.js';
 // 无 Worker 端缓存：删完库里立刻可读，不需要任何失效动作。
 
 export async function handleDeleteAccount(request, env, corsHeaders) {
@@ -32,13 +32,14 @@ export async function handleDeleteAccount(request, env, corsHeaders) {
       .eq('owner_id', userId);
     if (selErr) throw selErr;
 
-    // 2) 先逐站清文件；任一失败立即中止，账号与记录保留，用户可重试
-    for (const site of (sites || [])) {
-      const rmErr = await removeSiteFiles(env, supabase, site);
+    // 2) 一次性清光所有站点的 Storage 文件（project 前缀一次 RPC 查完、按桶批量删）。
+    //    失败立即中止，账号与 gh_site 记录都保留，用户可重试；不会留下孤儿。
+    if (sites?.length) {
+      const rmErr = await removeSitesFiles(env, supabase, sites);
       if (rmErr) {
-        console.error('[delete-account] storage remove failed:', site.type, site.name, rmErr.message);
+        console.error('[delete-account] storage remove failed:', rmErr.message);
         return jsonResp({
-          error: `站点「${site.name}」存储清理失败，请重试注销`,
+          error: '站点文件清理失败，请重试注销',
           partial: true
         }, 500, corsHeaders);
       }

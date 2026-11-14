@@ -6,11 +6,16 @@
 // 全量同步已移到 public.admin_email_map()（一次 SQL 聚合），
 // 见 admin/sync-emails.js 与 debug.js；此处不再分页遍历 Auth Admin 接口。
 
-import { storageUrl } from './supabase.js';
+// 与 supabase.js 的 storageUrl 同构，但内联在此：本模块被 deleteUserCore 动态导入，
+// 若 import supabase.js 就会把 @supabase/supabase-js 拖进基础删除链路的依赖图。
+function mapUrl(env, path) {
+  const host = String(env?.SUPABASE_URL || '').replace(/^https:\/\//, '').replace(/\/$/, '');
+  return `https://${host}/storage/v1/object/${path}`;
+}
 
 async function fetchEmailMap(env) {
   try {
-    const res = await fetch(storageUrl(env, 'admin/email-map.json'), {
+    const res = await fetch(mapUrl(env, 'admin/email-map.json'), {
       headers: {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -26,7 +31,7 @@ async function fetchEmailMap(env) {
 /** @returns {Promise<boolean>} 写入是否成功（旧实现吞掉所有失败） */
 async function saveEmailMap(env, map) {
   try {
-    const res = await fetch(storageUrl(env, 'admin/email-map.json'), {
+    const res = await fetch(mapUrl(env, 'admin/email-map.json'), {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,

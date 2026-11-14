@@ -1,35 +1,14 @@
 // ===== 获取站点文件列表 =====
+//
+// 旧版在文件内自带一份 walk() 递归调用 Storage List API，且 `!res.ok` 时静默
+// return 空列表 —— 既是「目录越多请求越多」的子请求炸弹，也会把「查不到」
+// 伪装成「没有文件」。现在统一走 storage-cleanup.js 的数据库 RPC，
+// 一次查询拿全，失败直接冒泡成 500。
 
 import { getUserId } from '../utils/jwt.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
-
-// 递归列出桶内文件，返回相对路径
-async function listAllFiles(env, bucket, prefix) {
-  const out = [];
-  async function walk(pfx, rel) {
-    const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prefix: pfx, limit: 1000, offset: 0 }),
-    });
-    if (!res.ok) return;
-    const items = await res.json();
-    for (const it of (items || [])) {
-      const isDir = it.metadata == null;
-      if (isDir) {
-        await walk(pfx + it.name + '/', rel + it.name + '/');
-      } else {
-        out.push({ name: rel + it.name, size: it.metadata?.size || 0 });
-      }
-    }
-  }
-  await walk(prefix, '');
-  return out;
-}
+import { listAllFileItems } from '../utils/storage-cleanup.js';
 
 export async function handleSiteFiles(request, env, corsHeaders, slug) {
   const userId = await getUserId(request, env);
@@ -54,13 +33,16 @@ export async function handleSiteFiles(request, env, corsHeaders, slug) {
 
     let files = [];
     if (site.type === 'project') {
-      files = await listAllFiles(env, 'projects', `${site.owner_id}/${actualSlug}/`);
+      const prefix = `${site.owner_id}/${actualSlug}/`;
+      const items = await listAllFileItems(env, 'projects', prefix);
+      files = items.map(i => ({ name: i.path.slice(prefix.length), size: i.size }));
     } else {
       files = [{ name: site.type === 'md' ? 'index.md' : 'index.html', size: null }];
     }
 
     return jsonResp({ site, files }, 200, corsHeaders);
   } catch (err) {
+    console.error('[site-files] failed:', actualSlug, err.message);
     return jsonResp({ error: err.message }, 500, corsHeaders);
   }
 }

@@ -12,14 +12,18 @@ import { checkRateLimit } from '../utils/rate-limit.js';
 import { UUID_RE, requireAdminContext } from '../utils/admin-data.js';
 import {
   normalizeBanDuration, parseUserIds, parseSiteNames,
+  MAX_BATCH_USERS, MAX_BATCH_BAN_USERS,
   deleteUserCore, deleteSiteCore, setUserBanCore, runBatch,
 } from '../utils/admin-actions.js';
 
 const SELF_BLOCK = '不能封禁、解封或删除当前登录的管理员账号';
 
-// 有限并发：删站要逐站列 Storage 目录再分批删除，串行太慢会顶到前端超时。
-// 删用户涉及 Auth 删除，保守一点；封禁/解封只是一次 Auth 调用，可以稍高。
-const CONCURRENCY = { sites: 3, userDelete: 2, userBan: 4 };
+// 有限并发。Storage 列文件已改成「按桶聚合 + 一次 RPC」，单站请求数降到 ~4 次，
+// 不再需要高并发来压延迟；并发本身不减少子请求总数，反而会让同一瞬间打满配额。
+// 删用户串行（每个用户含 Auth 删除 + email-map 读写），封禁只是一次 Auth 调用可稍高。
+// 单次批量上限见 admin-actions.js 的 MAX_BATCH_USERS / MAX_BATCH_SITES，
+// 前端会把更大的勾选自动分块成多次 HTTP 请求。
+const CONCURRENCY = { sites: 2, userDelete: 1, userBan: 4 };
 
 async function readBody(request) {
   try { return await request.json(); } catch { return null; }
@@ -27,11 +31,14 @@ async function readBody(request) {
 
 /** 纯逻辑，便于无网络自测 */
 export async function batchUsersCore(supabase, env, body, adminId) {
-  const parsed = parseUserIds(body?.userIds);
-  if (parsed.error) return { status: 400, data: { error: parsed.error } };
-
   const action = ['ban', 'unban', 'delete'].includes(body?.action) ? body.action : '';
   if (!action) return { status: 400, data: { error: '不支持的批量操作（仅 ban / unban / delete）' } };
+
+  // 删除用户每个要走 Storage + 记录 + Auth + email-map，子请求多；
+  // 封禁/解封只是一次 Auth 调用，可以放宽到与后台每页条数一致。
+  const parsed = parseUserIds(body?.userIds,
+    action === 'delete' ? MAX_BATCH_USERS : MAX_BATCH_BAN_USERS);
+  if (parsed.error) return { status: 400, data: { error: parsed.error } };
 
   const duration = normalizeBanDuration(body?.duration);
   const worker = async (uid) => {

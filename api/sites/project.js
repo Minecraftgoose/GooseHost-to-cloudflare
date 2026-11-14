@@ -57,7 +57,9 @@ const MIME = {
   wasm: 'application/wasm',
 };
 
-const MAX_FILES = 50;
+// 防爆限制：上传循环里每个文件一次 PUT，Workers 单次请求的子请求有上限。
+// 30 个 PUT + 失败回滚的 1 次批量 remove + 删记录 1 次 + 前置校验，留足余量。
+const MAX_FILES = 30;
 const MAX_FILE_SIZE = 200 * 1024;      // 单文件 200KB
 const MAX_TOTAL = 2 * 1024 * 1024;     // 总 2MB
 const MAX_ZIP_B64 = 3 * 1024 * 1024;   // base64 后 zip 上限，约 2.2MB 原始
