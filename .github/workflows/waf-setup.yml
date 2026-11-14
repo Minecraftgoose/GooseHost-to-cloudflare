@@ -46,7 +46,14 @@ jobs:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: bash scripts/waf-setup.sh
 
+      - name: Dry run notice
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "### dry run：未调用任何写接口，边缘规则未变更" >> "$GITHUB_STEP_SUMMARY"
+          echo '如需真正配置，请取消勾选 dry_run 后重跑本 workflow。' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Done
+        if: ${{ !inputs.dry_run }}
         run: |
           echo "✓ 边缘 WAF 规则已就绪（可在 Dashboard → Security → WAF → Rate limiting rules 查看）" \
             >> "$GITHUB_STEP_SUMMARY"

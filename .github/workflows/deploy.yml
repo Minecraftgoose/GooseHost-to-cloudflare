@@ -88,8 +88,9 @@ jobs:
       - name: Worker deploy summary
         run: |
           echo "### Worker 部署完成" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 项目：`gh-site-api-production`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 分支：`${{ github.ref_name }}`" >> "$GITHUB_STEP_SUMMARY"
+          echo '- 项目：`gh-site-api-production`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 分支：`${{ github.ref_name }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '> SQL 迁移顺序：`sql/admin_perf.sql` → `sql/storage_rpc_patch.sql` → `sql/access_control.sql`（幂等，缺任一会返回带指引的错误）' >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
   # 2) 前端：Cloudflare Pages（gh-site-frontend，生产分支 main）
@@ -133,7 +134,7 @@ jobs:
       - name: Frontend deploy summary
         run: |
           echo "### 前端部署完成" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Pages 项目：`gh-site-frontend`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 生产分支：`main`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 部署目录：`front/`" >> "$GITHUB_STEP_SUMMARY"
+          echo '- Pages 项目：`gh-site-frontend`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 生产分支：`main`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 部署目录：`front/`' >> "$GITHUB_STEP_SUMMARY"
           echo "- 默认域名：https://gh-site-frontend.pages.dev" >> "$GITHUB_STEP_SUMMARY"
