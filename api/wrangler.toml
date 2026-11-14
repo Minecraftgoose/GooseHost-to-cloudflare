@@ -12,6 +12,14 @@ CORS_ALLOW_ALL = "on"
 # 例如 Cloudflare Pages 的预览域名：CORS_EXTRA_ORIGINS = "https://xxx.pages.dev"
 CORS_EXTRA_ORIGINS = ""
 
+# 封锁功能的安全白名单：逗号分隔的 IP / CIDR，命中后一律放行且不允许写进规则表。
+# 强烈建议填自己的固定出口 IP，避免误把自己锁在管理后台外。
+# 例：BLOCK_SAFE_IPS = "203.0.113.7,2001:db8:abcd::/48"
+BLOCK_SAFE_IPS = ""
+
+# Storage RPC 每页行数（上限 1000）；项目 db-max-rows 更小时调小。
+STORAGE_RPC_PAGE_SIZE = "1000"
+
 API_URL = "https://page.goose.cc.cd"
 ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6dc5d4ec2955,91e8157c-63e7-4dd7-ada9-0e3749d3c789"
 
@@ -28,3 +36,53 @@ id = "12b92271a0a44fa692fa99e2a639a5f9"
 [[kv_namespaces]]
 binding = "API_KEYS_KV"
 id = "a660a8cd825a488abe4cb38620450578"
+
+# =====================================================================
+# Workers Rate Limiting bindings（短窗口 10s / 60s 档）
+#
+# 官方文档：https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+#   · simple.period 只能是 10 或 60 秒，所以 3600 秒的长窗口档位
+#     改由 public.admin_rate_check() 在 Postgres 里做（见 sql/access_control.sql）
+#   · limit 是绑定级固定值，不同额度必须不同 namespace；同一 namespace 内
+#     Worker 用 `${action}:${dim}` 作 key 隔开，不同接口互不串计数
+#   · 计数是 approximate 且每个 Cloudflare 位置独立，允许短暂超限；
+#     这是官方明示的限制，接受它换取零跨网 RTT
+#   · namespace_id 必须是账号内唯一的正整数（字符串形式）。下面从 8101 起，
+#     若你的账号已占用请改成别的一组数字
+#   · 这组绑定在 Cloudflare Dashboard 里不可见，只以本文件为准；
+#     CI（npx wrangler deploy）会随脚本一起上传，无需本地装 Wrangler
+# =====================================================================
+[[ratelimits]]
+name = "RL_10_10"
+namespace_id = "8101"
+[ratelimits.simple]
+limit = 10
+period = 10
+
+[[ratelimits]]
+name = "RL_10_60"
+namespace_id = "8102"
+[ratelimits.simple]
+limit = 10
+period = 60
+
+[[ratelimits]]
+name = "RL_100_60"
+namespace_id = "8103"
+[ratelimits.simple]
+limit = 100
+period = 60
+
+[[ratelimits]]
+name = "RL_20_60"
+namespace_id = "8104"
+[ratelimits.simple]
+limit = 20
+period = 60
+
+[[ratelimits]]
+name = "RL_40_60"
+namespace_id = "8105"
+[ratelimits.simple]
+limit = 40
+period = 60

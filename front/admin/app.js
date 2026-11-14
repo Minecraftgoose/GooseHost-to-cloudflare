@@ -234,6 +234,7 @@
         sites: { page: 1, q: '', type: '', order: 'updatedAt', dir: 'desc' },
         play: { tab: 'posts', page: 1, q: '' },
         tools: { ownerId: '', result: null },
+        blocks: { page: 1, q: '', kind: '', hits: null },
         siteDetail: null,
         userDetail: null,
         selection: { users: new Set(), sites: new Set() },
@@ -310,6 +311,7 @@
                 case 'play': await renderPlay(token); break;
                 case 'announcement': await renderAnnouncement(token); break;
                 case 'tools': await renderTools(token); break;
+                case 'blocks': await renderBlocks(token); break;
                 default: await renderOverview(token);
             }
         } catch (err) {
@@ -967,6 +969,131 @@
     }
 
     /* ------------------------------------------------------------------
+     * 访问控制：IP / CIDR / 邮箱后缀封锁
+     * ------------------------------------------------------------------ */
+
+    const KIND_LABEL = { ip: '单 IP', cidr: 'IP 网段', email_domain: '邮箱后缀' };
+
+    function toLocalInput(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function blockModal(rule) {
+        const r = rule || {};
+        const isEdit = !!r.id;
+        openModal(
+            `<div class="gh-modal-head"><span>${isEdit ? '编辑规则 #' + esc(r.id) : '新增封锁规则'}</span>` +
+            `<button class="gh-modal-close" data-action="modal-close"><i class="fas fa-xmark"></i></button></div>` +
+            `<div class="gh-modal-body">` +
+            `<div class="gh-field"><label class="gh-label">规则类型</label>` +
+            `<select id="blkKind" class="gh-select" style="width:100%">` +
+            Object.entries(KIND_LABEL).map(([k, v]) =>
+                `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${v}</option>`).join('') +
+            `</select></div>` +
+            `<div class="gh-field"><label class="gh-label">规则值</label>` +
+            `<input id="blkValue" class="gh-input" maxlength="255" placeholder="1.2.3.4 / 1.2.3.0/24 / example.com" value="${esc(r.value || '')}"></div>` +
+            `<div class="gh-field"><label class="gh-label">模式</label>` +
+            `<select id="blkMode" class="gh-select" style="width:100%">` +
+            `<option value="observe" ${r.mode !== 'block' ? 'selected' : ''}>观察（只记日志，不拦）</option>` +
+            `<option value="block" ${r.mode === 'block' ? 'selected' : ''}>拦截</option>` +
+            `</select></div>` +
+            `<div class="gh-field"><label class="gh-label">备注（选填）</label>` +
+            `<input id="blkNote" class="gh-input" maxlength="200" placeholder="封禁原因" value="${esc(r.note || '')}"></div>` +
+            `<div class="gh-field"><label class="gh-label">过期时间（选填，留空永久）</label>` +
+            `<input id="blkExpires" class="gh-input" type="datetime-local" value="${esc(toLocalInput(r.expires_at))}"></div>` +
+            `<div class="gh-field"><label class="gh-label">状态</label>` +
+            `<select id="blkEnabled" class="gh-select" style="width:100%">` +
+            `<option value="1" ${r.enabled !== false ? 'selected' : ''}>启用</option>` +
+            `<option value="0" ${r.enabled === false ? 'selected' : ''}>停用</option>` +
+            `</select></div>` +
+            `<p class="gh-note" style="margin-top:10px">新规则默认「观察」，建议先在命中日志里确认无误伤再改成「拦截」。` +
+            `规则变更后约 60 秒内全网生效；<code>BLOCK_SAFE_IPS</code> 白名单内的 IP 永远放行且不允许写入。</p>` +
+            `</div>` +
+            `<div class="gh-modal-foot"><button class="gh-btn" data-action="modal-close">取消</button>` +
+            `<button class="gh-btn gh-btn-primary" data-action="block-save" data-id="${esc(r.id || '')}"><i class="fas fa-floppy-disk"></i> 保存</button></div>`
+        );
+    }
+
+    async function renderBlocks(token) {
+        setCrumb([{ text: '封锁规则' }]);
+        const b = state.blocks;
+        view.innerHTML = pageHead('fa-shield-halved', '访问控制',
+            'IP / CIDR / 邮箱后缀封锁 · 变更后约 60 秒全网生效',
+            `<button class="gh-btn gh-btn-primary" data-action="block-add"><i class="fas fa-plus"></i> 新增规则</button>` +
+            `<button class="gh-btn" data-action="block-refresh"><i class="fas fa-rotate"></i> 重发快照</button>` +
+            refreshBtn()) + loading();
+
+        const d = await api('/api/admin/block-rules?' + qs({ q: b.q, kind: b.kind, page: b.page, size: PAGE_SIZE }));
+        if (!guard(token)) return;
+        b.items = d.items || [];
+
+        const snap = d.snapshot || {};
+        const rows = b.items.map((r) => {
+            const expired = r.expired || (r.expires_at && new Date(r.expires_at).getTime() <= Date.now());
+            const status = !r.enabled ? badge('已停用', 'muted')
+                : expired ? badge('已过期', 'warn')
+                    : (r.mode === 'block' ? badge('拦截中', 'danger') : badge('观察中', 'warn'));
+            const ops =
+                `<button class="gh-btn gh-btn-sm gh-btn-link" data-action="block-toggle" data-id="${esc(r.id)}">${r.mode === 'block' ? '改为观察' : '改为拦截'}</button>` +
+                `<button class="gh-btn gh-btn-sm gh-btn-link" data-action="block-edit" data-id="${esc(r.id)}">编辑</button>` +
+                `<button class="gh-btn gh-btn-sm gh-btn-link gh-btn-danger" data-action="block-delete" data-id="${esc(r.id)}">删除</button>`;
+            return `<tr><td>${badge(KIND_LABEL[r.kind] || r.kind, 'muted')}</td>` +
+                `<td class="gh-mono">${esc(r.value)}</td><td>${status}</td>` +
+                `<td class="gh-ellipsis">${esc(r.note) || '—'}</td>` +
+                `<td class="gh-cell-muted gh-nowrap">${fmtDate(r.created_at)}</td>` +
+                `<td class="gh-cell-muted gh-nowrap">${r.expires_at ? fmtDate(r.expires_at) : '永久'}</td>` +
+                `<td class="gh-cell-actions">${ops}</td></tr>`;
+        });
+
+        const total = Number(d.total) || 0;
+        const pager = pagerHtml({ total, page: b.page, totalPages: Math.ceil(total / PAGE_SIZE) }, 'blocks');
+        const kindOptions = [['', '全部类型'], ...Object.entries(KIND_LABEL)]
+            .map(([k, v]) => `<option value="${k}" ${b.kind === k ? 'selected' : ''}>${esc(v)}</option>`).join('');
+
+        let html = pageHead('fa-shield-halved', '访问控制',
+            'IP / CIDR / 邮箱后缀封锁 · 变更后约 60 秒全网生效',
+            `<button class="gh-btn gh-btn-primary" data-action="block-add"><i class="fas fa-plus"></i> 新增规则</button>` +
+            `<button class="gh-btn" data-action="block-refresh"><i class="fas fa-rotate"></i> 重发快照</button>` +
+            refreshBtn());
+
+        html += cardPadded('fa-circle-info', '生效口径',
+            kv([
+                ['事实来源', 'Postgres `gh_block_rules` → Workers KV 快照'],
+                ['快照版本', `#${fmtNum(snap.version || 0)} · ${fmtNum(snap.ruleCount || 0)} 条生效规则`],
+                ['生效延迟', badge('≤ 60 秒', 'warn') + ' （KV 最终一致）'],
+                ['拦截范围', 'API 请求；公开站点 /s/ /p/ /md/ 不拦'],
+                ['邮箱后缀', '只拦新注册；已有账号封禁用 Auth ban_duration'],
+            ]) +
+            `<p class="gh-note" style="margin-top:10px">规则管理接口自身不受拦截，避免误把自己锁在后台外；` +
+            `可在 <code>api/wrangler.toml</code> 的 <code>BLOCK_SAFE_IPS</code> 填自己的固定出口 IP。</p>`);
+
+        html += card('fa-list', '规则列表',
+            `<div class="gh-toolbar">${searchHtml('blocks', '搜索规则值 / 备注', b.q)}` +
+            `<label class="gh-select-wrap"><select data-filter="blocks-kind" class="gh-select">${kindOptions}</select></label></div>` +
+            tableHtml(['类型', '规则值', '模式', '备注', '创建时间', '过期时间', ''], rows,
+                empty('fa-shield-halved', '暂无封锁规则', '点右上角「新增规则」开始'),
+                ['100px', '', '100px', '', '150px', '150px', '200px']) + pager);
+
+        const hits = b.hits;
+        let hitsBody = `<p class="gh-note">点「查看命中」加载最近 100 条；观察模式的命中也记在这里，可用来确认误伤面。</p>`;
+        if (hits) {
+            const hitRows = (hits || []).map(h => `<tr><td class="gh-cell-muted gh-nowrap">${fmtDate(h.hit_at)}</td>` +
+                `<td>${badge(h.mode === 'block' ? '拦截' : '观察', h.mode === 'block' ? 'danger' : 'warn')}</td>` +
+                `<td class="gh-mono">${esc(h.value)}</td><td class="gh-cell-muted">${esc(h.path)}</td></tr>`).join('');
+            hitsBody = tableHtml(['时间', '模式', '命中规则', '路径'], [hitRows].flat().filter(Boolean),
+                empty('fa-clock-rotate-left', '暂无命中记录'), ['160px', '90px', '', '']);
+        }
+        html += card('fa-clock-rotate-left', '命中日志', hitsBody,
+            `<button class="gh-btn" data-action="block-hits"><i class="fas fa-magnifying-glass"></i> 查看命中</button>`);
+
+        view.innerHTML = html;
+    }
+
+    /* ------------------------------------------------------------------
      * 事件委托
      * ------------------------------------------------------------------ */
 
@@ -1147,6 +1274,86 @@
                 if (fn) { try { await fn(value); } catch (e) { toast(e.message, 'error'); } }
                 break;
             }
+            /* ---- 访问控制：封锁规则 ---- */
+            case 'block-add': blockModal(null); break;
+            case 'block-edit': {
+                const r = (state.blocks.items || []).find(x => String(x.id) === String(ds.id));
+                if (r) blockModal(r); else toast('规则数据已失效，请刷新重试', 'error');
+                break;
+            }
+            case 'block-save': {
+                const body = {
+                    kind: document.getElementById('blkKind')?.value || 'ip',
+                    value: (document.getElementById('blkValue')?.value || '').trim(),
+                    mode: document.getElementById('blkMode')?.value || 'observe',
+                    note: (document.getElementById('blkNote')?.value || '').trim(),
+                    expiresAt: document.getElementById('blkExpires')?.value || '',
+                    enabled: document.getElementById('blkEnabled')?.value !== '0',
+                };
+                if (ds.id) body.id = Number(ds.id);
+                if (!body.value) { toast('规则值不能为空', 'error'); break; }
+                closeModal();
+                try {
+                    await post('/api/admin/block-rules', body);
+                    toast('规则已保存，约 60 秒内全网生效', 'success');
+                    forceRefresh = true; await reload();
+                } catch (e) { toast(e.message, 'error'); }
+                break;
+            }
+            case 'block-delete': {
+                const id = ds.id;
+                confirmAction({
+                    title: '删除封锁规则',
+                    message: '确定删除这条规则吗？删除后会立即重发快照。',
+                    confirmText: '删除',
+                    onConfirm: async () => {
+                        await post('/api/admin/block-rules/' + encodeURIComponent(id), null, 'DELETE');
+                        toast('规则已删除', 'success');
+                        forceRefresh = true; await reload();
+                    },
+                });
+                break;
+            }
+            case 'block-toggle': {
+                const r = (state.blocks.items || []).find(x => String(x.id) === String(ds.id));
+                if (!r) { toast('规则数据已失效，请刷新重试', 'error'); break; }
+                const next = r.mode === 'block' ? 'observe' : 'block';
+                confirmAction({
+                    title: next === 'block' ? '启用拦截' : '改为观察',
+                    message: next === 'block'
+                        ? `确认对「${r.value}」启用拦截？建议先在命中日志确认没有误伤。`
+                        : `确认把「${r.value}」改为观察模式（只记日志不拦）？`,
+                    confirmText: '确认',
+                    danger: next === 'block',
+                    onConfirm: async () => {
+                        await post('/api/admin/block-rules', {
+                            id: r.id, kind: r.kind, value: r.value, mode: next,
+                            note: r.note || '',
+                            expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : '',
+                            enabled: r.enabled !== false,
+                        });
+                        toast(next === 'block' ? '已启用拦截' : '已改为观察', 'success');
+                        forceRefresh = true; await reload();
+                    },
+                });
+                break;
+            }
+            case 'block-refresh': {
+                try {
+                    const d = await post('/api/admin/block-rules/refresh', {});
+                    toast(`快照已重发：${fmtNum(d.ruleCount)} 条规则`, 'success');
+                    forceRefresh = true; await reload();
+                } catch (e) { toast(e.message, 'error'); }
+                break;
+            }
+            case 'block-hits': {
+                try {
+                    const d = await api('/api/admin/block-rules/hits');
+                    state.blocks.hits = d.hits || [];
+                    await reload();
+                } catch (e) { toast(e.message, 'error'); }
+                break;
+            }
             case 'modal-close': closeModal(); break;
             case 'modal-confirm': {
                 const fn = pendingConfirm;
@@ -1307,6 +1514,7 @@
             if (scope === 'users') { state.users.q = val.trim(); state.users.page = 1; await withFocus(() => renderUsers(currentToken())); }
             else if (scope === 'sites') { state.sites.q = val.trim(); state.sites.page = 1; await withFocus(() => renderSites(currentToken())); }
             else if (scope === 'play') { state.play.q = val.trim(); state.play.page = 1; await withFocus(() => renderPlay(currentToken())); }
+            else if (scope === 'blocks') { state.blocks.q = val.trim(); state.blocks.page = 1; await withFocus(() => renderBlocks(currentToken())); }
         }, 320);
     });
 
@@ -1318,6 +1526,7 @@
         else if (f === 'sites-type') { clearSelection('sites'); state.sites.type = t.value; state.sites.page = 1; reload(); }
         else if (f === 'sites-order') { clearSelection('sites'); state.sites.order = t.value; state.sites.page = 1; reload(); }
         else if (f === 'orphan-owner') { state.tools.ownerId = t.value.trim(); }
+        else if (f === 'blocks-kind') { state.blocks.kind = t.value; state.blocks.page = 1; reload(); }
     });
 
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeModal(); });

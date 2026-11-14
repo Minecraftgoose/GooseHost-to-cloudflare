@@ -16,10 +16,42 @@ concurrency:
 
 jobs:
   # ============================================================
+  # 0) 自测门禁：任何一组失败就不部署，避免把坏版本推到生产
+  # ============================================================
+  test:
+    name: Self tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run self tests
+        run: |
+          set -e
+          for t in tests/*.mjs; do
+            echo "---- $t ----"
+            node "$t"
+          done
+
+      - name: Remind SQL migrations
+        run: |
+          echo "### 部署前请确认已执行过 SQL 迁移" >> "$GITHUB_STEP_SUMMARY"
+          echo '`sql/admin_perf.sql` → `sql/storage_rpc_patch.sql` → `sql/access_control.sql`' \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '三份都是幂等；缺任意一份，对应功能会返回带指引的错误而不是静默失败。' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
   # 1) 后端：Cloudflare Worker（gh-site-api-production）
   # ============================================================
   worker:
     name: Deploy Worker
+    needs: test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +72,20 @@ jobs:
 
       - name: Build (esbuild 打包 index.js -> worker.js)
         run: npm run build
+
+      # [[ratelimits]] 绑定需要 Wrangler >= 4.36；api/package.json 的
+      # devDependencies 已固定 wrangler ^4.156.0，npm ci 会装好。
+      # 这里显式校验，避免以后有人降级依赖却没人发现绑定被静默忽略。
+      - name: Verify Wrangler supports ratelimits binding
+        run: |
+          V=$(npx wrangler --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+          echo "Wrangler: ${V:-unknown}"
+          node -e '
+            const v = (process.argv[1] || "0.0.0").split(".").map(Number);
+            const ok = v[0] > 4 || (v[0] === 4 && (v[1] || 0) >= 36);
+            if (!ok) { console.error("::error::需要 Wrangler >= 4.36 才能部署 [[ratelimits]] 绑定"); process.exit(1); }
+            console.log("✓ 支持 ratelimits 绑定");
+          ' "$V"
 
       - name: Push secrets to Cloudflare
         env:
@@ -97,6 +143,7 @@ jobs:
   # ============================================================
   frontend:
     name: Deploy Frontend (Pages)
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

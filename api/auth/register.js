@@ -3,7 +3,7 @@
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { fetchEmailMap, saveEmailMap } from '../utils/email-map.js';
 import { jsonResp } from '../utils/response.js';
-import { isDisposableEmail } from './blocked-emails.js';
+import { assertEmailAllowed } from './email-guard.js';
 
 export async function handleRegister(request, env, corsHeaders) {
   // Check per-IP registration limit (5 per hour)
@@ -48,9 +48,10 @@ export async function handleRegister(request, env, corsHeaders) {
     return jsonResp({ error: '昵称仅支持中英文、数字、下划线、空格和连字符' }, 400, corsHeaders);
   }
 
-  // Block disposable/temporary email domains
-  if (isDisposableEmail(email)) {
-    return jsonResp({ error: '暂不支持该临时邮箱，请使用真实邮箱' }, 400, corsHeaders);
+  // 统一邮箱守卫：gh_block_rules 快照（支持后台增删 / observe 模式）+ 静态种子兜底
+  const guard = await assertEmailAllowed(request, env, email);
+  if (!guard.allowed) {
+    return jsonResp({ error: guard.error }, 400, corsHeaders);
   }
 
   // Register via Supabase Auth REST API

@@ -1,0 +1,52 @@
+name: Setup Edge WAF Rate Limit (run once)
+
+# 边缘 WAF 规则是持久配置，不随代码部署变化 —— 手动跑一次即可，
+# 不需要（也不应该）塞进每次 push 的主部署流水线。
+#
+# 为什么单独一个 workflow：
+#   主 deploy.yml 用的 CLOUDFLARE_API_TOKEN 通常只勾了 Workers / Pages 写权限，
+#   没有 Zone WAF / Rulesets 权限。若把这一步挂在主流程上，token 权限不够就会
+#   让整个 Worker/Pages 部署失败。这里独立触发，失败也不影响线上代码。
+#
+# 需要的 Repository Secrets：
+#   CLOUDFLARE_API_TOKEN  含 Zone WAF Write 或 Zone Rulesets Write
+#   CLOUDFLARE_ZONE_ID    站点 Zone ID（Cloudflare Dashboard 右下角）
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只打印将要提交的规则，不调用写接口'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  waf:
+    name: Configure zone rate limiting rule
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show planned rule
+        run: |
+          echo "### 边缘限流规则（免费版合规参数）" >> "$GITHUB_STEP_SUMMARY"
+          echo '- 匹配：`starts_with(http.request.uri.path, "/api/")`  ' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 计数：`cf.colo.id` + `ip.src`，10 秒窗口 60 次  ' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 动作：block，缓解期 10 秒  ' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 幂等：按 description 查找并更新，重复运行不会堆规则' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply rule
+        if: ${{ !inputs.dry_run }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: bash scripts/waf-setup.sh
+
+      - name: Done
+        run: |
+          echo "✓ 边缘 WAF 规则已就绪（可在 Dashboard → Security → WAF → Rate limiting rules 查看）" \
+            >> "$GITHUB_STEP_SUMMARY"

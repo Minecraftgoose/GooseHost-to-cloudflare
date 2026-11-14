@@ -3,6 +3,8 @@
 import { getCorsHeaders } from './utils/cors.js';
 import { jsonResp } from './utils/response.js';
 import { bindRequestContext } from './utils/request-context.js';
+import { evaluateBlock, getClientIp } from './utils/block-rules.js';
+import { recordBlockHit } from './utils/block-audit.js';
 
 import { handleRegister } from './auth/register.js';
 import { handleLogin } from './auth/login.js';
@@ -32,6 +34,7 @@ import { handleAdminSiteDetail, handleAdminSiteUpdate } from './admin/site-detai
 import { handleAdminDeleteUser, handleAdminDeleteSite } from './admin/delete-user.js';
 import { handleAdminBanUser, handleAdminBatchUsers, handleAdminBatchSites } from './admin/batch.js';
 import { handleAdminCleanupOrphans } from './admin/cleanup-orphans.js';
+import { handleAdminBlockRules } from './admin/block-rules.js';
 import { handleAdminSyncEmails } from './admin/sync-emails.js';
 import { handleGetAnnouncement, handleAdminGetAnnouncement, handleAdminAnnouncement } from './admin/announcement.js';
 import { handlePublicStats } from './admin/public-stats.js';
@@ -109,6 +112,26 @@ export default {
 
     if (method === 'OPTIONS') {
       return new Response('', { status: 200, headers: corsHeaders });
+    }
+
+    // === 访问控制统一拦截层 ===
+    // 顺序固定：CORS → IP 硬封（最便宜）→ 限流 → 鉴权 → 业务。
+    // 公开站点访问 /s/ /p/ /md/ 默认不拦（误伤正常读者），
+    // 规则管理接口自身不拦（避免管理员把自己锁在后台外）。
+    {
+      const verdict = await evaluateBlock(request, env, url.pathname, pathParts);
+      if (verdict) {
+        recordBlockHit(request, env, {
+          rule: verdict.rule, kind: verdict.kind,
+          actorRaw: getClientIp(request), path: url.pathname,
+        });
+        if (verdict.mode === 'block') {
+          return jsonResp({ error: '访问被拒绝' }, 403, corsHeaders);
+        }
+        console.info('[block] observe 命中:', {
+          ruleId: verdict.rule.id, value: verdict.rule.value, path: url.pathname,
+        });
+      }
     }
 
     // === 公开路由 ===
@@ -326,6 +349,11 @@ export default {
     // POST /api/admin/cleanup-orphans - 历史孤儿文件清理（默认 dryRun 预览）
     if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'cleanup-orphans' && !pathParts[3] && method === 'POST') {
       return await handleAdminCleanupOrphans(request, env, corsHeaders);
+    }
+
+    // /api/admin/block-rules[/:id | /hits | /refresh] - IP / CIDR / 邮箱后缀封锁
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin' && pathParts[2] === 'block-rules' && !pathParts[4]) {
+      return await handleAdminBlockRules(request, env, corsHeaders, pathParts[3] || '');
     }
 
     // DELETE /api/admin/user/:userId - 删除用户（路径参数版）
