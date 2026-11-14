@@ -5,7 +5,7 @@ import { checkRateLimit } from '../utils/rate-limit.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
 import { removeSiteFiles } from '../utils/storage-cleanup.js';
-import { invalidateAdminCache } from '../utils/admin-data.js';
+// 无 Worker 端缓存：删完库里立刻可读，不需要任何失效动作。
 
 export async function handleDelete(request, env, corsHeaders) {
   const userId = await getUserId(request, env);
@@ -58,7 +58,6 @@ export async function handleDelete(request, env, corsHeaders) {
 
     if (delError) throw delError;
 
-    invalidateAdminCache(env);
     return jsonResp({ success: true }, 200, corsHeaders);
   } catch (err) {
     return jsonResp({ error: err.message }, 500, corsHeaders);

@@ -1,9 +1,12 @@
-// ===== 邮箱映射管理（旧版兼容，仅保留写入/同步）=====
+// ===== 邮箱映射管理（旧版兼容，仅保留读/写）=====
 //
-// 新后台直接读 Supabase Auth Admin API，这里只服务 register.js 与
+// 新后台直接读 Supabase Auth / Postgres RPC，这里只服务 register.js 与
 // delete-user.js 的历史逻辑。不要用这份文件作为展示数据源：它是一份副本。
+//
+// 全量同步已移到 public.admin_email_map()（一次 SQL 聚合），
+// 见 admin/sync-emails.js 与 debug.js；此处不再分页遍历 Auth Admin 接口。
 
-import { storageUrl, makeSupabase } from './supabase.js';
+import { storageUrl } from './supabase.js';
 
 async function fetchEmailMap(env) {
   try {
@@ -44,26 +47,4 @@ async function saveEmailMap(env, map) {
   }
 }
 
-/** 兼容工具：按 Auth Admin API 分页拉全量用户重建映射 */
-async function syncEmailMap(env) {
-  try {
-    const supabase = makeSupabase(env);
-    const perPage = 1000;
-    const users = [];
-    for (let page = 1; page <= 20; page++) {
-      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-      if (error) throw error;
-      const batch = data?.users || [];
-      users.push(...batch);
-      if (batch.length < perPage) break;
-    }
-    const map = {};
-    users.forEach(u => { if (u?.id && u?.email) map[u.id] = u.email; });
-    return await saveEmailMap(env, map) ? map : null;
-  } catch (err) {
-    console.error('syncEmailMap failed:', err.message);
-    return null;
-  }
-}
-
-export { fetchEmailMap, saveEmailMap, syncEmailMap };
+export { fetchEmailMap, saveEmailMap };

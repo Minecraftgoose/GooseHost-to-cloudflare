@@ -11,7 +11,7 @@ import { makeSupabase } from '../utils/supabase.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import {
   requireAdmin, pager, cleanSearch, pagePayload,
-  getAllAuthUsers, ownerIndex,
+  getUserBriefs,
 } from '../utils/admin-data.js';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -22,11 +22,11 @@ async function profileMap(supabase, env, ids) {
   const uniq = [...new Set((ids || []).filter(Boolean))];
   if (!uniq.length) return map;
 
-  const [{ data: profiles }, { users }] = await Promise.all([
+  // 只查「当前页这几位作者」，不再为补邮箱而全量拉 Auth 用户
+  const [{ data: profiles }, authIndex] = await Promise.all([
     supabase.from('gh_play_profile').select('id, nickname, avatar_url, bio').in('id', uniq),
-    getAllAuthUsers(supabase, env),
+    getUserBriefs(supabase, uniq),
   ]);
-  const authIndex = ownerIndex(users);
 
   for (const p of (profiles || [])) {
     const a = authIndex.get(p.id);
@@ -118,7 +118,8 @@ export async function handleAdminPlayPosts(request, env, corsHeaders) {
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-posts] failed:', err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -187,7 +188,8 @@ export async function handleAdminPlayComments(request, env, corsHeaders) {
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-comments] failed:', err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -237,7 +239,8 @@ export async function handleAdminPlayPostDetail(request, env, corsHeaders, postI
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-post-detail] failed:', postId, err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -274,7 +277,8 @@ export async function handleAdminDeletePlayPost(request, env, corsHeaders, postI
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-delete-post] failed:', postId, err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -312,7 +316,8 @@ export async function handleAdminDeletePlayComment(request, env, corsHeaders, co
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-delete-comment] failed:', commentId, err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -341,6 +346,7 @@ export async function handleAdminPlayStats(request, env, corsHeaders) {
     }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-play-stats] failed:', err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }

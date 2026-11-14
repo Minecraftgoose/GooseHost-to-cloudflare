@@ -11,8 +11,7 @@ import { jsonResp } from '../utils/response.js';
 import { makeSupabase, storageUrl } from '../utils/supabase.js';
 import { listAllFileItems } from '../utils/storage-cleanup.js';
 import {
-  requireAdmin, publicUser, invalidateAdminCache, siteView,
-  getAllAuthUsers, ownerIndex,
+  requireAdmin, publicUser, siteView, getUserBriefs,
 } from '../utils/admin-data.js';
 
 // 宽松校验：支持中文、字母、数字、_ - . ~ /，长度 1~128
@@ -54,7 +53,9 @@ export async function handleAdminSiteDetail(request, env, corsHeaders, slugEncod
     if (error) throw error;
     if (!row) return jsonResp({ error: '站点不存在' }, 404, corsHeaders);
 
-    // 所有者：优先按 uid 精确取（官方 getUserById），失败则回退到全量索引
+    // 所有者：优先按 uid 精确取（官方 getUserById）；失败时用一次批量 RPC 兜底。
+    // 旧版在这里回退到「全量 Auth 用户扫描」，Auth 一抖动就把打开一个站点详情
+    // 变成全站用户遍历，属于不可预测的延迟尖刺，已移除。
     let owner = null;
     if (row.owner_id) {
       const { data, error: authErr } = await supabase.auth.admin.getUserById(row.owner_id);
@@ -63,8 +64,12 @@ export async function handleAdminSiteDetail(request, env, corsHeaders, slugEncod
         const p = publicUser(raw);
         if (p?.uid) owner = p;
       } else {
-        const { users } = await getAllAuthUsers(supabase, env);
-        owner = ownerIndex(users).get(row.owner_id) || null;
+        try {
+          const briefs = await getUserBriefs(supabase, [row.owner_id]);
+          owner = briefs.get(row.owner_id) || null;
+        } catch (e) {
+          console.warn('[admin-site-detail] owner lookup failed:', e.message);
+        }
       }
     }
 
@@ -89,7 +94,8 @@ export async function handleAdminSiteDetail(request, env, corsHeaders, slugEncod
     return jsonResp({ site }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-site-detail] failed:', slug, err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
 
@@ -147,10 +153,10 @@ export async function handleAdminSiteUpdate(request, env, corsHeaders, slugEncod
       throw new Error(`文件上传失败: HTTP ${res.status} ${detail.slice(0, 160)}`);
     }
 
-    invalidateAdminCache(env);
     return jsonResp({ success: true }, 200, corsHeaders);
   } catch (err) {
     console.error('[admin-site-update] failed:', slug, err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }

@@ -13,7 +13,8 @@
 // 管理员手里没有，因此这里不做「假装立即踢下线」的动作，只在响应与 UI 里如实提示。
 // 若要真正即时生效，需缩短 JWT_EXPIRY 或在 RLS / 业务层检查 banned_until。
 
-import { invalidateAdminCache, UUID_RE } from './admin-data.js';
+import { UUID_RE } from './admin-data.js';
+// 后台读接口已无 Worker 端缓存（全部实时查库），写操作不需要再 invalidate。
 import { removeSiteFiles } from './storage-cleanup.js';
 
 /** 允许的封禁时长白名单（禁止任意字符串传给 GoTrue） */
@@ -72,7 +73,6 @@ export async function deleteSiteCore(supabase, env, siteName) {
     .eq('name', site.name);
   if (delError) throw new Error('删除站点记录失败：' + delError.message);
 
-  invalidateAdminCache(env);
   return { name: site.name, type: site.type || 'html' };
 }
 
@@ -116,7 +116,6 @@ export async function deleteUserCore(supabase, env, targetUserId) {
     console.error('[admin-actions] 更新邮箱映射失败:', err.message);
   }
 
-  invalidateAdminCache(env);
   return { deletedSites: sites?.length || 0 };
 }
 
@@ -129,7 +128,6 @@ export async function setUserBanCore(supabase, env, uid, action, duration) {
   if (error) throw new Error((isUnban ? '解封' : '封禁') + '失败：' + (error.message || error));
 
   const user = data?.user || data;
-  invalidateAdminCache(env);
 
   return {
     action: isUnban ? 'unban' : 'ban',

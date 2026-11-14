@@ -1,9 +1,10 @@
 // ===== 公开统计 =====
 //
-// 旧实现 select('visit_count') 一次性取全表，PostgREST 默认最多返回 1000 行，
-// 站点过千时 total_sites / total_visits 都会停在 1000。现在分页聚合 + count exact。
+// 旧实现：1 次 count + 最多 50 次 select(visit_count).range(...) 分页累加，
+// 站点过千时既慢又会漏算。v2 用 public.site_totals() 一次 SQL 聚合。
 
 import { makeSupabase } from '../utils/supabase.js';
+import { siteTotals } from '../utils/admin-data.js';
 
 function resp(data, status, corsHeaders, cache) {
   return new Response(JSON.stringify(data), {
@@ -18,26 +19,11 @@ function resp(data, status, corsHeaders, cache) {
 
 export async function handlePublicStats(request, env, corsHeaders) {
   try {
-    const supabase = makeSupabase(env);
-    const { count, error } = await supabase
-      .from('gh_site')
-      .select('id', { count: 'exact', head: true });
-    if (error) throw error;
-
-    let totalVisits = 0;
-    const PAGE = 1000;
-    const pages = Math.min(50, Math.ceil((count || 0) / PAGE));
-    for (let p = 0; p < pages; p++) {
-      const { data, error: pageErr } = await supabase
-        .from('gh_site')
-        .select('visit_count')
-        .range(p * PAGE, (p + 1) * PAGE - 1);
-      if (pageErr) throw pageErr;
-      for (const r of (data || [])) totalVisits += Number(r.visit_count) || 0;
-    }
-
-    return resp({ total_sites: count || 0, total_visits: totalVisits }, 200, corsHeaders, 'public, max-age=60');
+    const totals = await siteTotals(makeSupabase(env));
+    return resp(totals, 200, corsHeaders, 'public, max-age=60');
   } catch (err) {
-    return resp({ error: err.message }, 500, corsHeaders);
+    console.error('[public-stats] failed:', err.message);
+    return resp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 500, corsHeaders);
   }
 }

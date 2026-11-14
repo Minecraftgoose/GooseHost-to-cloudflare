@@ -6,6 +6,7 @@ import { makeSupabase, storageUrl } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
 import { getPublicBaseUrl } from '../utils/site-url.js';
 import { getClientIP } from '../utils/rate-limit.js';
+import { runInBackground } from '../utils/request-context.js';
 
 const ALLOWED_EXTS = new Set([
   'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'md', 'markdown',
@@ -219,17 +220,16 @@ export async function handleServeProject(request, env, slug, subPath) {
     const res = await fetch(storageUrl(env, storagePath), { headers: anonHeaders });
     if (!res.ok) continue;
     if (cand === 'index.html' || cand === 'index.md') {
-      try {
-        await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/increment_visit`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ p_name: slug }),
-        });
-      } catch (e) {}
+      // 与页面内容无关的计数：放到响应之后，不计入 TTFB
+      await runInBackground(request, () => fetch(`${env.SUPABASE_URL}/rest/v1/rpc/increment_visit`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_name: slug }),
+      }));
     }
     const dot = cand.lastIndexOf('.');
     const ext = dot === -1 ? '' : cand.slice(dot + 1).toLowerCase();

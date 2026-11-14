@@ -43,27 +43,32 @@ export async function handleAdminCleanupOrphans(request, env, corsHeaders) {
       }
     }
 
-    // 第一遍：只扫描、不删除。任一桶列目录失败就整体中止，避免删一半。
+    // 第一遍：只扫描、不删除。三个桶并发列目录（旧版串行，桶内递归又串行，很慢）。
+    // Promise.all 保证任一桶失败即整体中止，不会出现「扫了一半就开始删」。
     const doomedByBucket = {};
     const scanned = {};
     let skipped = 0;
 
-    for (const bucket of BUCKETS) {
+    const scans = await Promise.all(BUCKETS.map(async bucket => {
       const prefix = ownerId ? `${ownerId}/` : '';
       const paths = await listAllFiles(env, bucket, prefix);
-      scanned[bucket] = paths.length;
-
       const doomed = [];
+      let localSkipped = 0;
       for (const p of paths) {
         const parts = p.split('/');
         if (parts.length < 3 || !parts[1] || !UUID_RE.test(parts[0])) {
-          skipped++;
+          localSkipped++;
           continue;
         }
         const sitePrefix = `${parts[0]}/${parts[1]}/`;
         if (!valid.has(`${bucket}:${sitePrefix}`)) doomed.push(p);
       }
-      doomedByBucket[bucket] = doomed;
+      return { bucket, paths, doomed, localSkipped };
+    }));
+    for (const r of scans) {
+      scanned[r.bucket] = r.paths.length;
+      doomedByBucket[r.bucket] = r.doomed;
+      skipped += r.localSkipped;
     }
 
     // 汇总分组（按 bucket + 前两级目录），方便人工核对

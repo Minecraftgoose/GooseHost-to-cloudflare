@@ -2,6 +2,7 @@
 
 import { getCorsHeaders } from './utils/cors.js';
 import { jsonResp } from './utils/response.js';
+import { bindRequestContext } from './utils/request-context.js';
 
 import { handleRegister } from './auth/register.js';
 import { handleLogin } from './auth/login.js';
@@ -73,9 +74,12 @@ import {
 
 // ===== Workers Entry =====
 function makeHandler(inner) {
-  return async (request, env) => {
+  return async (request, env, ctx) => {
+    // 绑定执行上下文：让「访问计数」等非关键写操作可在响应后完成，
+    // 而不是把一次跨网 RPC 计入用户的 TTFB。
+    bindRequestContext(request, ctx);
     try {
-      return await inner(request, env);
+      return await inner(request, env, ctx);
     } catch (e) {
       const url = (() => { try { return new URL(request.url); } catch { return null; } })();
       const pathname = url ? url.pathname : '?';
@@ -87,6 +91,10 @@ function makeHandler(inner) {
       // 兜底：必须带上 CORS 头，否则浏览器只会看到
       // "CORS 头缺少 Access-Control-Allow-Origin"，把真实错误掩盖掉。
       // 生产响应体只返回 requestId，堆栈走日志查。
+      // 数据库函数没装时给出可执行的指引，而不是一句笼统的 500
+      if (e && e.missingMigration) {
+        return jsonResp({ error: e.message, migration: 'sql/admin_perf.sql' }, 503, getCorsHeaders(request, env));
+      }
       const reqId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'n/a';
       return jsonResp({ error: '服务端内部错误', requestId: reqId }, 500, getCorsHeaders(request, env));
     }

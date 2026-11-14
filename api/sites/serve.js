@@ -2,6 +2,7 @@
 
 import { marked } from 'marked';
 import { makeSupabaseAnon, storageUrl } from '../utils/supabase.js';
+import { runInBackground } from '../utils/request-context.js';
 
 // 配置 marked 生成 URL-safe 的 heading ID
 marked.use({
@@ -153,18 +154,17 @@ export async function handleServeSite(request, env, slug) {
     return new Response(render404Page('内容未找到'), { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
 
-  // 计数：Worker 会冻结未 await 的异步，须等响应返回
-  try {
-    await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/increment_visit`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ p_name: actualSlug }),
-    });
-  } catch (e) {}
+  // 计数与页面内容无关：用 ctx.waitUntil 放到响应之后，不再计入 TTFB。
+  // runInBackground 在没有 ctx 的运行时会退化为 await，任务不会丢。
+  await runInBackground(request, () => fetch(`${env.SUPABASE_URL}/rest/v1/rpc/increment_visit`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ p_name: actualSlug }),
+  }));
 
   const injectBase = (html, prefix) => {
     const baseTag = `<base href="${prefix}">`;

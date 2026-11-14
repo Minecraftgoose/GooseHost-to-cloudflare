@@ -1,22 +1,19 @@
-// ===== 管理后台公共数据层 =====
+// ===== 管理后台公共数据层（v2：数据库内分页 / 聚合）=====
 //
-// 依据 Supabase 官方文档重写，统一「用户从哪来、站点从哪来、权限怎么判」：
+// 旧版把「全部 Auth 用户 + 全部 gh_site 行」分页拉回 Worker，再在内存里
+// filter / sort / slice(25)，还配了一个只在单个 isolate 内有效、被 refresh=1
+// 绕过的 Map 缓存。数据量一上来就是 O(全站) 的延迟，且跨节点数据不一致。
 //
-//   · Auth 用户：supabase.auth.admin.listUsers({ page, perPage }) / getUserById(uid)
-//     https://supabase.com/docs/reference/javascript/auth-admin-listusers
-//     https://supabase.com/docs/reference/javascript/auth-admin-getuserbyid
-//     这两个方法只能在服务端用 service_role key 调用，绝不能进浏览器。
-//     user 对象字段：id / email / created_at / last_sign_in_at / user_metadata /
-//     app_metadata / identities / email_confirmed_at / is_anonymous / banned_until
-//     https://supabase.com/docs/guides/auth/users
-//   · 站点：gh_site 表（PostgREST），分页拉全量后在内存聚合，避免依赖
-//     数据库里是否装了 get_users_paginated / get_sites_paginated 这类 RPC，
-//     也避免为每个用户发一次 count 查询（N+1）。
-//   · 旧版用 admin/email-map.json 当邮箱来源；那是一份会过期的副本。
-//     现在 Auth Admin API 是唯一事实来源，email-map 只在兼容路径里保留。
+// v2 的原则（不留后患）：
+//   · 单一事实来源：auth.users + gh_site，不建影子表、不做数据同步；
+//   · 过滤 / 排序 / 分页 / 聚合 / JOIN 全部下推到 Postgres（sql/admin_perf.sql）；
+//   · 因此 Worker 端**没有任何缓存**，也就不需要 invalidate：写完立刻可读，
+//     跨 Worker 实例永远一致，refresh=1 退化为无操作（仅保留参数兼容前端）；
+//   · 所有 RPC 都是 SECURITY DEFINER，只暴露展示字段，权限仅授予 service_role。
 //
-// 注意：user_metadata 由用户可自行修改，文档明确要求「不得用于安全敏感上下文」。
-// 这里只把它用于展示昵称，管理员判定依然完全依赖 isAdmin()（ADMIN_USER_IDS）。
+// 需要的函数：见仓库 sql/admin_perf.sql（部署前在 Supabase SQL Editor 执行一次）。
+// 若函数缺失，rpc() 会抛出带 migrationHint 的错误，handler 统一返回 503 指引，
+// 而不是静默退化回全量扫描。
 
 import { isAdmin, getUserId } from './jwt.js';
 import { jsonResp } from './response.js';
@@ -25,33 +22,22 @@ import { getPublicBaseUrl } from './site-url.js';
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const SITE_COLS = 'id, name, type, owner_id, ip_address, created_at, updated_at, visit_count';
 
-const AUTH_PER_PAGE = 1000;   // 官方示例支持 perPage: 1000
-const AUTH_MAX_PAGES = 20;    // 防御性上限：2 万用户，正常项目远达不到
-const SITE_PER_PAGE = 1000;   // PostgREST 默认最大行数
-const SITE_MAX_PAGES = 50;    // 5 万站点
-const CACHE_TTL_MS = 20_000;  // Workers 实例内短缓存，削减 Auth Admin API 压力
+const MIGRATION_HINT = '管理后台数据库函数未安装，请在 Supabase SQL Editor 执行 sql/admin_perf.sql 后重试';
+const MISSING_FN_RE = /could not find the function|function\s+public\.|does not exist|pgrst202|42883|schema cache/i;
 
-const cache = new Map();      // key: `${SUPABASE_URL}::users|::sites`
+/** 统一 RPC 调用：把「函数不存在」变成可识别、可给出指引的错误 */
+export async function rpc(supabase, fn, args = {}) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (!error) return data;
 
-function cacheKey(env, kind) {
-  return `${env?.SUPABASE_URL || 'default'}::${kind}`;
-}
-
-function readCache(env, kind, force) {
-  if (force) return null;
-  const hit = cache.get(cacheKey(env, kind));
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
-  return null;
-}
-
-function writeCache(env, kind, value) {
-  cache.set(cacheKey(env, kind), { at: Date.now(), value });
-}
-
-/** 写操作（删站/删用户/同步）后调用，保证下一次读立即看到新状态 */
-export function invalidateAdminCache(env) {
-  cache.delete(cacheKey(env, 'users'));
-  cache.delete(cacheKey(env, 'sites'));
+  const code = String(error.code || '');
+  const msg = String(error.message || '');
+  const missing = code === 'PGRST202' || code === '42883' || MISSING_FN_RE.test(msg);
+  const err = new Error(missing ? MIGRATION_HINT : `数据库函数 ${fn} 调用失败: ${msg || error}`);
+  err.status = missing ? 503 : 502;
+  err.missingMigration = missing;
+  err.rpc = fn;
+  throw err;
 }
 
 /** 统一管理员鉴权，返回 Response 表示已拒绝 */
@@ -63,9 +49,8 @@ export async function requireAdmin(request, env, corsHeaders) {
 }
 
 /**
- * 管理员鉴权 + 返回当前操作者 UID。
- * 用于「禁止封禁/删除当前管理员自己」这类自保校验，只解析一次会话，
- * 避免 isAdmin() 与 getUserId() 各发一次 /auth/v1/user。
+ * 管理员鉴权 + 当前操作者 UID（只解析一次会话）。
+ * 所有 admin 入口应优先用它，避免 isAdmin() 与 getUserId() 各发一次校验请求。
  */
 export async function requireAdminContext(request, env, corsHeaders) {
   const adminId = await getUserId(request, env);
@@ -86,7 +71,7 @@ export function pager(sp, { defLimit = 25, maxLimit = 100 } = {}) {
   return { limit, offset, page: Math.floor(offset / limit) + 1 };
 }
 
-/** 清洗搜索词：去掉 PostgREST 过滤语法与 ilike 通配符，防止用户输入变成查询语法 */
+/** 清洗搜索词：SQL 用 position() 不会把输入当语法，这里只做长度与噪声控制 */
 export function cleanSearch(q, maxLen = 64) {
   return String(q || '')
     .replace(/["'(),.*%\\:;\[\]{}<>\n\r]/g, ' ')
@@ -113,8 +98,9 @@ function firstString(...vals) {
 }
 
 /**
- * Supabase Auth User → 后台展示用对象。
- * 名字取 user_metadata.nickname（项目注册/改昵称写入的字段），兼容常见别名。
+ * Supabase Auth User → 后台展示对象（单用户详情 / briefs 复用）。
+ * 名字取 user_metadata.nickname；user_metadata 用户可改，仅用于展示，
+ * 管理员判定始终依赖 isAdmin() / ADMIN_USER_IDS。
  */
 export function publicUser(u) {
   if (!u) return null;
@@ -143,85 +129,143 @@ export function publicUser(u) {
   };
 }
 
-/** 遍历 Auth Admin listUsers 的所有分页（官方无服务端搜索/过滤，只能客户端筛） */
-export async function getAllAuthUsers(supabase, env, { force = false } = {}) {
-  const cached = readCache(env, 'users', force);
-  if (cached) return { ...cached, cached: true };
-
-  const users = [];
-  let truncated = false;
-  for (let page = 1; page <= AUTH_MAX_PAGES; page++) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: AUTH_PER_PAGE });
-    if (error) throw new Error(`Supabase Auth listUsers 失败: ${error.message || error}`);
-    const batch = data?.users || [];
-    users.push(...batch);
-    if (batch.length < AUTH_PER_PAGE) break;
-    if (page === AUTH_MAX_PAGES) truncated = true;
-  }
-
-  const value = { users, truncated };
-  writeCache(env, 'users', value);
-  return { ...value, cached: false };
+/** RPC 返回的用户行 → 展示对象（字段已经是扁平的） */
+export function userViewFromRow(r) {
+  return {
+    id: r.uid || '',
+    uid: r.uid || '',
+    email: r.email || '',
+    name: r.name || '',
+    createdAt: r.created_at || null,
+    lastSignInAt: r.last_sign_in_at || null,
+    updatedAt: r.updated_at || null,
+    emailConfirmedAt: r.email_confirmed_at || null,
+    isAnonymous: !!r.is_anonymous,
+    bannedUntil: r.banned_until || null,
+    provider: r.provider || (r.email ? 'email' : 'unknown'),
+    siteCount: Number(r.site_count) || 0,
+  };
 }
 
-/** 分页拉全量 gh_site，避免 PostgREST 默认 1000 行截断导致统计失真 */
-export async function getAllSiteRows(supabase, env, { force = false } = {}) {
-  const cached = readCache(env, 'sites', force);
-  if (cached) return { ...cached, cached: true };
+const USER_SORTS = ['createdAt', 'lastSignInAt', 'email', 'name', 'siteCount'];
+const SITE_SORTS = ['createdAt', 'updatedAt', 'visitCount', 'name', 'ownerEmail'];
+const SITE_TYPES = ['html', 'md', 'project'];
 
-  const rows = [];
-  let truncated = false;
-  for (let page = 0; page < SITE_MAX_PAGES; page++) {
-    const from = page * SITE_PER_PAGE;
-    const { data, error } = await supabase
-      .from('gh_site')
-      .select(SITE_COLS)
-      .order('created_at', { ascending: false })
-      .range(from, from + SITE_PER_PAGE - 1);
-    if (error) throw new Error(`查询 gh_site 失败: ${error.message || error}`);
-    const batch = data || [];
-    rows.push(...batch);
-    if (batch.length < SITE_PER_PAGE) break;
-    if (page === SITE_MAX_PAGES - 1) truncated = true;
-  }
+/**
+ * 用户列表：一次 RPC，数据库完成搜索 / 排序 / 分页 / 站点数聚合 / 总数统计。
+ * 传输量恒等于「每页条数」，与全站用户数无关。
+ */
+export async function listUsersPage(supabase, sp) {
+  const { limit, offset, page } = pager(sp, { defLimit: 25, maxLimit: 100 });
+  const q = cleanSearch(sp.get('q')).toLowerCase();
+  const sort = USER_SORTS.includes(sp.get('sort')) ? sp.get('sort') : 'createdAt';
+  const dir = (sp.get('dir') || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
-  const value = { rows, truncated };
-  writeCache(env, 'sites', value);
-  return { ...value, cached: false };
+  const rows = await rpc(supabase, 'admin_user_page', {
+    p_q: q, p_sort: sort, p_dir: dir, p_limit: limit, p_offset: offset,
+  });
+  const list = Array.isArray(rows) ? rows : [];
+  const total = list.length ? Number(list[0].total_count) || 0 : 0;
+  return {
+    users: list.map(userViewFromRow),
+    pagination: pagePayload({ page, limit, offset }, total, list.length),
+    meta: { source: 'postgres-rpc', migration: 'sql/admin_perf.sql' },
+  };
 }
 
-/** 单用户站点：直接按 owner_id 查，比全量缓存更实时 */
+/**
+ * 站点列表：一次 RPC，数据库 JOIN auth.users 出所有者，并完成全部筛选排序。
+ */
+export async function listSitesPage(supabase, env, sp) {
+  const { limit, offset, page } = pager(sp, { defLimit: 25, maxLimit: 100 });
+  const q = cleanSearch(sp.get('q')).toLowerCase();
+  const type = SITE_TYPES.includes(sp.get('type')) ? sp.get('type') : '';
+  const ownerParam = sp.get('ownerId') || '';
+  const ownerId = UUID_RE.test(ownerParam) ? ownerParam : '';
+  const sort = SITE_SORTS.includes(sp.get('order')) ? sp.get('order') : 'updatedAt';
+  const dir = (sp.get('dir') || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+  const rows = await rpc(supabase, 'admin_site_page', {
+    p_q: q, p_type: type, p_owner_id: ownerId,
+    p_sort: sort, p_dir: dir, p_limit: limit, p_offset: offset,
+  });
+  const list = Array.isArray(rows) ? rows : [];
+  const total = list.length ? Number(list[0].total_count) || 0 : 0;
+  return {
+    sites: list.map(r => siteView(r, null, env)),
+    pagination: pagePayload({ page, limit, offset }, total, list.length),
+    meta: { source: 'postgres-rpc', migration: 'sql/admin_perf.sql' },
+  };
+}
+
+/** 概览统计：一次 SQL 返回全部数字 + 最近 6 站点 / 6 用户 */
+export async function overviewStats(supabase, env) {
+  const rows = await rpc(supabase, 'admin_overview_stats');
+  const payload = Array.isArray(rows) ? rows[0]?.payload : (rows?.payload || rows);
+  if (!payload || typeof payload !== 'object') throw new Error('概览统计返回格式异常');
+
+  // recentSites 补上前端需要的 url / ownerName 等派生字段
+  const base = getPublicBaseUrl(env);
+  payload.recentSites = (payload.recentSites || []).map(s => ({
+    ...siteView(s, null, env),
+    url: `${base}${buildSitePath(s)}`,
+  }));
+  payload.meta = { source: 'postgres-rpc', migration: 'sql/admin_perf.sql' };
+  return payload;
+}
+
+/** 公开统计：一次聚合，替代 1 次 count + 最多 50 次分页累加 */
+export async function siteTotals(supabase) {
+  const rows = await rpc(supabase, 'site_totals');
+  const r = Array.isArray(rows) ? rows[0] : rows;
+  return {
+    total_sites: Number(r?.total_sites) || 0,
+    total_visits: Number(r?.total_visits) || 0,
+  };
+}
+
+/** 旧版 email-map 同步：一次 SQL，替代 20 页 listUsers 全量遍历 */
+export async function emailMapFromDb(supabase) {
+  const rows = await rpc(supabase, 'admin_email_map');
+  const payload = Array.isArray(rows) ? rows[0]?.payload : rows?.payload;
+  return payload && typeof payload === 'object' ? payload : {};
+}
+
+/**
+ * 按 uid 批量取用户简要信息 → Map。
+ * 用于广场列表补作者邮箱、站点详情补所有者等「小集合」场景。
+ * 不再为了补一页作者而拉全量 Auth 用户。
+ */
+export async function getUserBriefs(supabase, ids) {
+  const uniq = [...new Set((ids || []).map(x => String(x || '')).filter(Boolean))];
+  const map = new Map();
+  if (!uniq.length) return map;
+  const rows = await rpc(supabase, 'admin_user_briefs', { p_ids: uniq });
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    const p = userViewFromRow(r);
+    if (p.uid) map.set(p.uid, p);
+  }
+  return map;
+}
+
+/** 单用户站点：精确按 owner_id 查（带上限，避免极端账号拖垮请求） */
 export async function fetchOwnerSites(supabase, uid) {
-  const rows = [];
-  for (let page = 0; page < 10; page++) {
-    const from = page * SITE_PER_PAGE;
-    const { data, error } = await supabase
-      .from('gh_site')
-      .select(SITE_COLS)
-      .eq('owner_id', uid)
-      .order('created_at', { ascending: false })
-      .range(from, from + SITE_PER_PAGE - 1);
-    if (error) throw new Error(`查询用户站点失败: ${error.message || error}`);
-    const batch = data || [];
-    rows.push(...batch);
-    if (batch.length < SITE_PER_PAGE) break;
-  }
-  return rows;
+  const { data, error } = await supabase
+    .from('gh_site')
+    .select(SITE_COLS)
+    .eq('owner_id', uid)
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(`查询用户站点失败: ${error.message || error}`);
+  return data || [];
 }
 
+/** 把 Auth 用户数组转成 Map（仅用于已经拿到的**小集合**，绝不用于全量） */
 export function ownerIndex(users) {
   const map = new Map();
   for (const u of users) {
     const p = publicUser(u);
     if (p?.id) map.set(p.id, p);
-  }
-  return map;
-}
-
-export function countByOwner(rows) {
-  const map = new Map();
-  for (const s of rows) {
-    if (s?.owner_id) map.set(s.owner_id, (map.get(s.owner_id) || 0) + 1);
   }
   return map;
 }
@@ -233,25 +277,30 @@ export function buildSitePath(s) {
   return `/s/${slug}`;
 }
 
-/** gh_site 行 → 后台展示对象（附带所有者信息，来自 Auth，不再来自 email-map 副本） */
+/**
+ * gh_site 行 / RPC 行 → 后台展示对象。
+ * RPC 行自带 owner_email / owner_name；单表查询则回退到传入的 owners Map。
+ */
 export function siteView(s, owners, env) {
   const owner = owners?.get(s.owner_id) || null;
+  const name = s.name || '';
+  const type = s.type || 'html';
   return {
     id: s.id,
-    name: s.name,
-    type: s.type || 'html',
-    ownerId: s.owner_id || '',
-    ownerEmail: owner?.email || '',
-    ownerName: owner?.name || '',
-    ipAddress: s.ip_address || '',
-    createdAt: s.created_at || null,
-    updatedAt: s.updated_at || null,
-    visitCount: Number(s.visit_count) || 0,
-    url: `${getPublicBaseUrl(env)}${buildSitePath(s)}`,
+    name,
+    type,
+    ownerId: s.owner_id || s.ownerId || '',
+    ownerEmail: s.owner_email || s.ownerEmail || owner?.email || '',
+    ownerName: s.owner_name || s.ownerName || owner?.name || '',
+    ipAddress: s.ip_address || s.ipAddress || '',
+    createdAt: s.created_at || s.createdAt || null,
+    updatedAt: s.updated_at || s.updatedAt || null,
+    visitCount: Number(s.visit_count ?? s.visitCount) || 0,
+    url: `${getPublicBaseUrl(env)}${buildSitePath({ name, type })}`,
   };
 }
 
-/** 当天 00:00（Asia/Shanghai）的毫秒时间戳 */
+/** 当天 00:00（Asia/Shanghai）的毫秒时间戳 —— 仅前端展示辅助，热路径已不用 */
 export function todayStartCST() {
   const date = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   return Date.parse(`${date}T00:00:00+08:00`);

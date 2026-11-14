@@ -168,7 +168,9 @@
      * 请求封装
      * ------------------------------------------------------------------ */
 
-    let forceRefresh = false;   // 写操作后的第一次 GET 强制后端绕过 20s 缓存
+    // 兼容参数：后端已移除实例内缓存、全部实时查库，refresh=1 现在是 no-op。
+    // 保留它是为了让旧版本页面 / 书签链接依旧可用，不产生副作用。
+    let forceRefresh = false;
     async function api(path, opts) {
         opts = opts || {};
         const token = localStorage.getItem('sb_token');
@@ -496,7 +498,7 @@
             ['近 7 日活跃', d.activeUsers7d, 'fa-bolt'],
             ['累计访问量', d.totalVisits, 'fa-eye'],
         ];
-        let html = pageHead('fa-gauge-high', '站点概览', 'Asia/Shanghai 口径 · ' + (d.meta && d.meta.cached ? '缓存数据' : '实时读取') + (d.meta && (d.meta.usersTruncated || d.meta.sitesTruncated) ? ' · 已达扫描上限' : ''), refreshBtn());
+        let html = pageHead('fa-gauge-high', '站点概览', 'Asia/Shanghai 口径 · 数据库实时聚合（无缓存、无扫描上限）', refreshBtn());
         html += `<div class="gh-grid gh-grid-4" style="margin-bottom:16px">${stats.map(([k, v, icon]) =>
             `<div class="gh-stat"><div class="gh-stat-num">${fmtNum(v)}</div><div class="gh-stat-label"><i class="fas ${icon}"></i> ${esc(k)}</div></div>`
         ).join('')}</div>`;

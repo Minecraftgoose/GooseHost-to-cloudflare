@@ -11,7 +11,7 @@
 //   · supabase-js v2 的 remove() 返回 { data, error }，不抛异常，必须显式检查 error
 //   · 调用方先删文件、确认成功后再删 gh_site，失败时记录保留、用户可重试
 //   · 对不存在的路径幂等（Storage DELETE 未命中时返回 200 / 空 data）
-//   · project 站点递归列目录、分批删除
+//   · project 站点递归列目录、分批删除（同级目录 / 删除批次有限并发，避免 N+1 串行往返）
 //   · 列目录失败一律当成删除失败返回，绝不能「当成没文件」——否则会造出新的孤儿
 
 const REMOVE_BATCH = 500;      // Storage 单次 remove 上限 1000，留余量
@@ -20,9 +20,25 @@ const MAX_PAGES = 100;         // 防御 Storage 忽略 offset 导致的死循�
 const MAX_DEPTH = 20;          // 目录递归深度防御
 const RETRY_DELAY_MS = 300;    // 最终一致性窗口 / 瞬态网络错误的缓冲
 const MAX_RETRY = 2;           // 首次 + 1 次重试
+const LIST_CONCURRENCY = 6;    // 同级子目录并发列目录上限（别打爆 Storage）
+const REMOVE_CONCURRENCY = 3;  // 同一站点内分批 remove 的并发上限
 
 function toError(e) {
   return e instanceof Error ? e : new Error(e?.message || String(e));
+}
+
+/** 有限并发 map：保留结果顺序，任一项失败即整体 reject */
+async function mapLimit(items, limit, worker) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const n = Math.max(1, Math.min(limit, items.length || 1));
+  await Promise.all(Array.from({ length: n }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      out[i] = await worker(items[i], i);
+    }
+  }));
+  return out;
 }
 
 /** gh_site.type → 桶名 */
@@ -69,13 +85,16 @@ export async function listAllFileItems(env, bucket, prefix = '', depth = 0) {
     const items = await listPage(env, bucket, prefix, offset);
     if (!items.length) break;
 
+    const dirs = [];
     for (const it of items) {
-      if (it.metadata == null) {
-        const sub = await listAllFileItems(env, bucket, `${prefix}${it.name}/`, depth + 1);
-        out.push(...sub);
-      } else {
-        out.push({ path: `${prefix}${it.name}`, size: Number(it.metadata.size) || 0 });
-      }
+      if (it.metadata == null) dirs.push(it.name);
+      else out.push({ path: `${prefix}${it.name}`, size: Number(it.metadata.size) || 0 });
+    }
+    // 同级子目录并发递归：旧版对每个目录 await 一次，目录越多延迟线性叠加
+    if (dirs.length) {
+      const subs = await mapLimit(dirs, LIST_CONCURRENCY,
+        name => listAllFileItems(env, bucket, `${prefix}${name}/`, depth + 1));
+      for (const sub of subs) out.push(...sub);
     }
 
     if (items.length < LIST_LIMIT) break;
@@ -114,14 +133,17 @@ export async function collectSiteFiles(env, site) {
   return { bucket, paths: [`${ownerId}/${slug}/${fileName}`] };
 }
 
-/** 单轮：分批 remove，返回第一个 error 或 null */
+/** 单轮：分批 remove（有限并发），返回第一个 error 或 null */
 async function removeOnce(supabase, bucket, paths) {
+  const chunks = [];
   for (let i = 0; i < paths.length; i += REMOVE_BATCH) {
-    const chunk = paths.slice(i, i + REMOVE_BATCH);
-    const { error } = await supabase.storage.from(bucket).remove(chunk);
-    if (error) return toError(error);
+    chunks.push(paths.slice(i, i + REMOVE_BATCH));
   }
-  return null;
+  const results = await mapLimit(chunks, REMOVE_CONCURRENCY, async chunk => {
+    const { error } = await supabase.storage.from(bucket).remove(chunk);
+    return error ? toError(error) : null;
+  });
+  return results.find(Boolean) || null;
 }
 
 /**

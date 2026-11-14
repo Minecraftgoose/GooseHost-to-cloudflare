@@ -1,86 +1,15 @@
 // ===== 管理员 - 站点列表 =====
 //
-// 旧实现一半走 RPC get_sites_paginated、一半走 PostgREST 拼 or 字符串，
-// 搜索还要靠 email-map.json 副本反查 uid；RPC 缺失时总数、字段都会漂移。
-// 现在统一：Auth Admin API 提供所有者信息 + gh_site 分页拉全量 → 内存筛选排序分页。
-// 数据量上限由 admin-data.js 的 SITE_MAX_PAGES 控制（默认 5 万行）。
+// v2：public.admin_site_page() 在数据库内 JOIN auth.users 出所有者，
+// 并完成类型/所有者/关键词过滤、排序、分页与总数统计，一次 RPC 返回当前页。
+// 不再为补所有者邮箱而拉全量 Auth 用户，也不再拉全量 gh_site 在内存里排序。
 
 import { jsonResp } from '../utils/response.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
-import {
-  UUID_RE,
-  requireAdmin, pager, cleanSearch, pagePayload, parseTime,
-  getAllAuthUsers, getAllSiteRows, ownerIndex, siteView,
-} from '../utils/admin-data.js';
-
-const SITE_TYPES = ['html', 'md', 'project'];
-const SORT_KEYS = {
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  visitCount: 'visitCount',
-  name: 'name',
-  ownerEmail: 'ownerEmail',
-};
+import { requireAdmin, listSitesPage } from '../utils/admin-data.js';
 
 export async function listAdminSitesCore(supabase, env, sp) {
-  const { limit, offset, page } = pager(sp, { defLimit: 25, maxLimit: 100 });
-  const q = cleanSearch(sp.get('q')).toLowerCase();
-  const type = SITE_TYPES.includes(sp.get('type')) ? sp.get('type') : '';
-  const ownerParam = sp.get('ownerId') || '';
-  const ownerId = UUID_RE.test(ownerParam) ? ownerParam : '';
-  const sortKey = SORT_KEYS[sp.get('order')] || 'updatedAt';
-  const dir = (sp.get('dir') || '').toLowerCase() === 'asc' ? 1 : -1;
-  const force = sp.get('refresh') === '1';
-
-  const [auth, siteData] = await Promise.all([
-    getAllAuthUsers(supabase, env, { force }),
-    getAllSiteRows(supabase, env, { force }),
-  ]);
-  const owners = ownerIndex(auth.users);
-
-  let sites = siteData.rows.map(r => siteView(r, owners, env));
-
-  if (type) sites = sites.filter(s => (s.type || 'html') === type);
-  if (ownerId) sites = sites.filter(s => s.ownerId === ownerId);
-  if (q) {
-    sites = sites.filter(s =>
-      String(s.name || '').toLowerCase().includes(q) ||
-      String(s.ownerEmail || '').toLowerCase().includes(q) ||
-      String(s.ownerName || '').toLowerCase().includes(q) ||
-      String(s.ownerId || '').toLowerCase().includes(q) ||
-      String(s.ipAddress || '').toLowerCase().includes(q) ||
-      String(s.type || '').toLowerCase().includes(q)
-    );
-  }
-
-  sites.sort((a, b) => {
-    let av, bv;
-    if (sortKey === 'createdAt' || sortKey === 'updatedAt') {
-      av = parseTime(a[sortKey]); bv = parseTime(b[sortKey]);
-    } else if (sortKey === 'visitCount') {
-      av = a.visitCount; bv = b.visitCount;
-    } else {
-      av = String(a[sortKey] || '').toLowerCase();
-      bv = String(b[sortKey] || '').toLowerCase();
-    }
-    if (av < bv) return -1 * dir;
-    if (av > bv) return 1 * dir;
-    return String(a.name).localeCompare(String(b.name));
-  });
-
-  const total = sites.length;
-  const slice = sites.slice(offset, offset + limit);
-
-  return {
-    sites: slice,
-    pagination: pagePayload({ page, limit, offset }, total, slice.length),
-    meta: {
-      source: 'supabase-auth-admin + gh_site',
-      usersTruncated: auth.truncated,
-      sitesTruncated: siteData.truncated,
-      cached: auth.cached && siteData.cached,
-    },
-  };
+  return await listSitesPage(supabase, env, sp);
 }
 
 export async function handleAdminSites(request, env, corsHeaders) {
@@ -94,6 +23,7 @@ export async function handleAdminSites(request, env, corsHeaders) {
     return jsonResp(await listAdminSitesCore(makeSupabase(env), env, sp), 200, corsHeaders);
   } catch (err) {
     console.error('[admin-sites] failed:', err.message);
-    return jsonResp({ error: err.message }, 502, corsHeaders);
+    return jsonResp({ error: err.message, ...(err.missingMigration ? { migration: 'sql/admin_perf.sql' } : {}) },
+      err.status || 502, corsHeaders);
   }
 }
