@@ -31,7 +31,13 @@
             alt: '使用指南',
             title: '',
             desc: ''
-        }
+        },
+		{
+		    img: 'https://kimi-file.moonshot.cn/prod-chat-kimi/kfs/4/2/2026-11-07/1dbndnnrkvk6ic0iulhj0?x-tos-process=image%2Fauto-orient%2C1%2Fstrip%2Fresize%2Cw_480%2Ch_480%2Cm_mfit%2Fignore-error%2C1'
+			herf: 'https://ohdep.us.ci/'
+			alt: 'ohdep · 把想法变成网址'
+			title: 'ohdep · 把想法变成网址'
+		}
     ];
 
     /* 自动切换间隔（毫秒）；设为 0 则只手动滑动 */
