@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 440" width="1600" height="440" role="img" aria-label="使用指南">
+  <defs>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a2410"/>
+      <stop offset="0.55" stop-color="#8a4c15"/>
+      <stop offset="1" stop-color="#e59431"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="440" fill="url(#g3)"/>
+  <g fill="#ffe6bd" fill-opacity="0.14">
+    <circle cx="1300" cy="120" r="120"/>
+    <circle cx="1450" cy="320" r="76"/>
+    <circle cx="1160" cy="340" r="44"/>
+  </g>
+  <g fill="none" stroke="#ffe6bd" stroke-opacity="0.4" stroke-width="3">
+    <rect x="1190" y="122" width="240" height="196" rx="18"/>
+    <path d="M1190 172H1430"/>
+    <path d="M1240 230H1380M1240 268H1320"/>
+  </g>
+  <text x="96" y="186" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="30" letter-spacing="8" fill="#ffd9a1">GUIDE</text>
+  <text x="92" y="272" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="64" font-weight="700" fill="#ffffff">使用指南</text>
+  <text x="96" y="330" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="28" fill="#fff2df" fill-opacity="0.92">从零开始，把站点放上来</text>
+  <text x="96" y="386" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="22" fill="#fff2df" fill-opacity="0.65">部署与管理速查</text>
+</svg>

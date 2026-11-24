@@ -1838,3 +1838,188 @@
             margin-left: 1px;
         }
         @keyframes tw-blink { 50% { opacity: 0; } }
+
+        /* ==========================================================
+           首页精选位：横向滑动图集（纯 CSS，配合 dashboard/showcase.js）
+           命名统一用 gh-showcase 前缀，与页面其它模块隔离。
+           ========================================================== */
+        .gh-showcase {
+            margin: 0 0 1.5rem;
+            padding: 1.25rem 1.25rem 1rem;
+            background: rgba(20, 35, 25, 0.8);
+            border: 1px solid var(--border, rgba(2, 255, 142, 0.15));
+            border-radius: 40px;
+            transition: box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        .gh-showcase[hidden] { display: none; }
+        .gh-showcase:hover {
+            box-shadow: 0 0 0 1px rgba(2, 255, 142, 0.35), 0 0 22px rgba(2, 255, 142, 0.12);
+            border-color: rgba(2, 255, 142, 0.3);
+        }
+
+        .gh-showcase-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.9rem;
+        }
+        .gh-showcase-label {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-fg, #eafff5);
+        }
+        .gh-showcase-mark {
+            width: 6px;
+            height: 18px;
+            border-radius: 6px;
+            flex: none;
+            background: var(--accent, #02ff8e);
+        }
+        .gh-showcase-nav { display: flex; gap: 0.5rem; flex: none; }
+        .gh-showcase-arrow {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--border, rgba(2, 255, 142, 0.15));
+            border-radius: 50%;
+            background: transparent;
+            color: var(--color-fg, #eafff5);
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+        .gh-showcase-arrow:hover {
+            border-color: var(--accent, #02ff8e);
+            color: var(--accent, #02ff8e);
+            transform: translateY(-1px);
+        }
+        .gh-showcase-arrow:focus-visible { outline: 2px solid var(--accent, #02ff8e); outline-offset: 2px; }
+
+        .gh-showcase-track {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            border-radius: 24px;
+            outline: none;
+            cursor: grab;
+        }
+        .gh-showcase-track::-webkit-scrollbar { display: none; }
+        .gh-showcase-track:focus-visible { box-shadow: 0 0 0 2px var(--accent, #02ff8e); }
+        .gh-showcase-track.is-dragging {
+            cursor: grabbing;
+            scroll-behavior: auto;
+            scroll-snap-type: none;
+        }
+
+        .gh-showcase-slide {
+            position: relative;
+            flex: 0 0 100%;
+            scroll-snap-align: start;
+            display: block;
+            height: clamp(150px, 21vw, 270px);
+            border: 1px solid var(--border, rgba(2, 255, 142, 0.15));
+            border-radius: 24px;
+            overflow: hidden;
+            background: linear-gradient(120deg, rgba(2, 255, 142, 0.14), rgba(2, 255, 142, 0.03) 55%, rgba(0, 0, 0, 0.12));
+            color: inherit;
+            text-decoration: none;
+            user-select: none;
+        }
+        .gh-showcase-slide img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+        .gh-showcase-caption {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 2.4rem 1.4rem 1.1rem;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+            color: #fff;
+            pointer-events: none;
+        }
+        .gh-showcase-caption strong { font-size: 1.05rem; font-weight: 600; }
+        .gh-showcase-caption span { font-size: 0.8rem; opacity: 0.82; }
+        .gh-showcase-slide.gh-fallback::after {
+            content: attr(data-fallback);
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: var(--color-fg, #eafff5);
+            font-size: 1rem;
+            opacity: 0.75;
+        }
+
+        .gh-showcase-dots {
+            display: flex;
+            justify-content: center;
+            gap: 0.45rem;
+            margin-top: 0.85rem;
+        }
+        .gh-showcase-dot {
+            width: 7px;
+            height: 7px;
+            padding: 0;
+            border: 0;
+            border-radius: 99px;
+            background: var(--border, rgba(2, 255, 142, 0.15));
+            opacity: 0.75;
+            cursor: pointer;
+            transition: width 0.25s ease, background 0.25s ease, opacity 0.25s ease;
+        }
+        .gh-showcase-dot.is-current {
+            width: 22px;
+            background: var(--accent, #02ff8e);
+            opacity: 1;
+        }
+        .gh-showcase.gh-single .gh-showcase-nav,
+        .gh-showcase.gh-single .gh-showcase-dots { display: none; }
+
+        /* 亮色主题 */
+        html[data-theme="light"][data-page="dashboard"] .gh-showcase {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.08);
+            box-shadow: 0 6px 24px rgba(16, 35, 26, 0.06);
+        }
+        html[data-theme="light"][data-page="dashboard"] .gh-showcase:hover {
+            box-shadow: 0 8px 28px rgba(16, 35, 26, 0.12);
+            border-color: rgba(0, 122, 66, 0.28);
+        }
+        html[data-theme="light"][data-page="dashboard"] .gh-showcase-slide {
+            background: linear-gradient(120deg, rgba(0, 122, 66, 0.10), rgba(0, 122, 66, 0.02) 55%, rgba(0, 0, 0, 0.03));
+        }
+
+        @media (max-width: 768px) {
+            .gh-showcase { padding: 1rem 1rem 0.85rem; border-radius: 28px; }
+            .gh-showcase-slide { height: clamp(140px, 42vw, 210px); border-radius: 18px; }
+            .gh-showcase-arrow { width: 30px; height: 30px; }
+            .gh-showcase-track { border-radius: 18px; }
+            .gh-showcase-caption strong { font-size: 0.92rem; }
+            .gh-showcase-caption span { font-size: 0.72rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .gh-showcase-track { scroll-behavior: auto; }
+            .gh-showcase-arrow, .gh-showcase, .gh-showcase-dot { transition: none; }
+        }

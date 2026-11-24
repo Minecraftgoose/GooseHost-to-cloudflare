@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 440" width="1600" height="440" role="img" aria-label="API 文档">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101b3c"/>
+      <stop offset="0.55" stop-color="#243a7a"/>
+      <stop offset="1" stop-color="#4f6ee0"/>
+    </linearGradient>
+    <linearGradient id="l2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#9ec5ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="440" fill="url(#g2)"/>
+  <g stroke="#9ec5ff" stroke-opacity="0.18" stroke-width="1">
+    <path d="M0 110H1600M0 220H1600M0 330H1600"/>
+    <path d="M200 0V440M400 0V440M600 0V440M800 0V440M1000 0V440M1200 0V440M1400 0V440"/>
+  </g>
+  <rect x="1120" y="86" width="380" height="268" rx="20" fill="#0b1430" fill-opacity="0.55" stroke="#9ec5ff" stroke-opacity="0.35"/>
+  <g font-family="Consolas,'Courier New',monospace" font-size="26">
+    <text x="1152" y="146" fill="#8affc8">GET</text>
+    <text x="1240" y="146" fill="#e8f0ff">/v1/sites</text>
+    <text x="1152" y="196" fill="#8affc8">POST</text>
+    <text x="1240" y="196" fill="#e8f0ff">/v1/deploy</text>
+    <text x="1152" y="246" fill="#8affc8">200</text>
+    <text x="1240" y="246" fill="#e8f0ff">{ ok: true }</text>
+  </g>
+  <rect x="1120" y="286" width="300" height="6" rx="3" fill="url(#l2)"/>
+  <text x="96" y="186" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="30" letter-spacing="8" fill="#a9c6ff">DOCS</text>
+  <text x="92" y="272" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="64" font-weight="700" fill="#ffffff">API 文档</text>
+  <text x="96" y="330" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="28" fill="#e2ecff" fill-opacity="0.9">几行代码，接上你的工作流</text>
+  <text x="96" y="386" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="22" fill="#e2ecff" fill-opacity="0.65">接口说明与调用示例</text>
+</svg>
