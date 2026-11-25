@@ -2012,7 +2012,8 @@
 
         @media (max-width: 768px) {
             .gh-showcase { padding: 1rem 1rem 0.85rem; border-radius: 28px; }
-            .gh-showcase-slide { height: clamp(140px, 42vw, 210px); border-radius: 18px; }
+            .gh-showcase-slide { height: clamp(96px, 30vw, 150px); border-radius: 18px; background: #0a0f14; }
+            .gh-showcase-slide img { object-fit: contain; }
             .gh-showcase-arrow { width: 30px; height: 30px; }
             .gh-showcase-track { border-radius: 18px; }
             .gh-showcase-caption strong { font-size: 0.92rem; }
