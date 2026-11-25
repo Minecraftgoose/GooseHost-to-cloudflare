@@ -47,6 +47,7 @@ import {
   handleAdminPlayStats
 } from './admin/play.js';
 
+import { getAdminRole } from './utils/jwt.js';
 import { enforceApiKeyScope } from './utils/apikey-scope.js';
 import { handleDebugSyncEmails, handleDebugTestAuth } from './debug.js';
 
@@ -226,6 +227,29 @@ export default {
       if (blocked) return blocked;
     }
 
+    /* ------------------------------------------------------------------
+     * 只读管理员闸门（第一道防线，位置必须在所有 /api/admin/* 路由之前）
+     *
+     * 为什么放在路由分发之前，而不是散到十几个 handler 里：
+     *   · 单点覆盖全部 admin 写接口，今后新增接口默认被保护，不会漏登记；
+     *   · 只读管理员对所有 GET 完全放行 —— 能看到后台的全部数据（用户、站点、
+     *     内容、公告、封锁规则、广场），只是不能改；
+     *   · 非管理员（role=null）这里不拦，交回原 handler 处理，行为完全不变。
+     *
+     * 判定口径：除 GET / HEAD / OPTIONS 外一律视为写。包括
+     * cleanup-orphans 的 dryRun 预览、block-rules/refresh 这类「看起来只读」
+     * 但走 POST 的接口 —— 只读管理员不发任何非 GET 请求，边界最清晰。
+     *
+     * 注意：各写接口 handler 内还有 requireWriteAdmin* 第二道防线，勿删其一。
+     * ------------------------------------------------------------------ */
+    if (pathParts[0] === 'api' && pathParts[1] === 'admin'
+        && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+      const role = await getAdminRole(request, env);
+      if (role === 'readonly') {
+        return jsonResp({ error: '只读管理员仅可查看，不能执行写操作' }, 403, corsHeaders);
+      }
+    }
+
     // === 需要认证的路由 ===
 
     // POST /api/delete-account - 销号
@@ -290,6 +314,7 @@ export default {
     }
 
     // === 管理员路由 ===
+    // 只读管理员的统一闸门已在上方「需要认证的路由」之前执行，此处无需重复判断。
 
     // GET /api/admin/stats - 统计信息
     if (url.pathname === '/api/admin/stats' && method === 'GET') {

@@ -4,6 +4,7 @@ import { jsonResp } from '../utils/response.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import { resolveApiKey, isApiKeyFormat } from '../utils/apikey.js';
 import { makeSupabase } from '../utils/supabase.js';
+import { adminRoleFor } from '../utils/jwt.js';
 
 function extractNickname(user) {
   if (!user) return '';
@@ -32,7 +33,8 @@ async function meByApiKey(userId, env) {
       id: user.id,
       email: user.email,
       nickname: extractNickname(user),
-      authType: 'api_key'
+      authType: 'api_key',
+      adminRole: adminRoleFor(userId, env)
     };
   } catch {
     return null;
@@ -67,7 +69,8 @@ export async function handleGetMe(request, env, corsHeaders) {
       id: user.id,
       email: user.email,
       nickname: extractNickname(user),
-      authType: 'session'
+      authType: 'session',
+      adminRole: adminRoleFor(user.id, env)
     }, 200, corsHeaders);
   } catch {
     return jsonResp({ error: '服务器错误' }, 500, corsHeaders);

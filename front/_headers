@@ -26,44 +26,58 @@
   Content-Type: text/html; charset=utf-8
   X-Content-Type-Options: nosniff
 
+# Dashboard 的 HTML 是 SPA 外壳，全部每次校验。
+# 这些路径都被 _redirects 以 200 rewrite 到同一份 /dashboard/index.html，
+# 壳里引用着带 ?v= 的资源；一旦壳被长期缓存，就会一直拉旧版本脚本。
+# （admin 那边已经踩过：注释见文件末尾。）
 /dashboard
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/deploy
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/mysite
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/mysite/
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/mysite/*
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/settings
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/account
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/copilot
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /dashboard/preferences
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
 /login
@@ -111,6 +125,40 @@
 
 /thanks/*
   Cache-Control: public, max-age=604800
+
+# ---------- Dashboard 静态资源缓存 ----------
+# 带 ?v=20261125 的稳定资源可以一年 immutable：浏览器命中缓存后
+# 连条件请求都不发，硬刷新子页面也不再重新下载/解析这些文件。
+# 改动这些文件时，把 /dashboard/index.html 里对应的 ?v= 号 +1，
+# URL 一变就是新资源，旧缓存自然失效。
+/dashboard/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/dashboard/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/theme.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/theme.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/squircle.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/auth-session.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# ---------- 例外：会频繁改动的文件，绝不长缓存 ----------
+# 下面两条比 /dashboard/*.js 更具体，优先级更高。
+# showcase.js 是加图时唯一要改的脚本；/showcase/ 里的素材也常被替换。
+# 用协商缓存：浏览器每次校验，命中 ETag 就返回 304 空体，改完刷新立刻生效，
+# 不需要同步改 index.html 的版本号。
+/dashboard/showcase.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/showcase/*
+  Cache-Control: public, max-age=0, must-revalidate
 
 # 后台 HTML 必须每次校验：否则浏览器缓存旧 HTML，
 # 里面引用的 app.js?v=旧版本 会一直跑旧脚本（表头修复不生效就是这么来的）。

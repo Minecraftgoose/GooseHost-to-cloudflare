@@ -127,15 +127,52 @@ async function getUserId(request, env) {
   }
 }
 
+/* ===== 管理员角色 =====
+ *
+ * 两种角色，都靠环境变量里的 UID 白名单判定（与现有 ADMIN_USER_IDS 同一套）：
+ *   · write    可写管理员 —— ADMIN_USER_IDS，原有行为完全不变
+ *   · readonly 只读管理员 —— ADMIN_READONLY_USER_IDS，新增
+ *
+ * 只读管理员能进后台看所有数据，但任何写操作都会被拒绝（主闸门在 api/index.js
+ * 的管理员路由段统一拦，handler 内还有第二道校验）。
+ *
+ * 为什么用「只读列表优先」：万一同一个 UID 被误填进两个列表，取权限更小的那个
+ * 更安全 —— 配置失误只会导致管理员临时失去写权限（删掉即可恢复，可逆），
+ * 反过来则会静默授予本不该有的写权限。
+ */
+function idList(env, key) {
+  return String(env?.[key] || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+/** 同步纯函数：给已解析出的 UID 判定角色，零网络开销 */
+function adminRoleFor(userId, env) {
+  if (!userId) return null;
+  // 只读优先，理由见上
+  if (idList(env, 'ADMIN_READONLY_USER_IDS').includes(userId)) return 'readonly';
+  if (idList(env, 'ADMIN_USER_IDS').includes(userId)) return 'write';
+  return null;
+}
+
+/** 一次会话解析出角色；GET 请求走 20s 校验缓存，几乎零成本 */
+async function getAdminRole(request, env) {
+  return adminRoleFor(await getUserId(request, env), env);
+}
+
+/** 任意管理员（含只读）—— 所有只读接口继续用它，语义向后兼容 */
 async function isAdmin(request, env) {
-  const userId = await getUserId(request, env);
-  if (!userId) return false;
-  const adminIds = (env.ADMIN_USER_IDS || '').split(',').filter(Boolean);
-  return adminIds.includes(userId);
+  return (await getAdminRole(request, env)) !== null;
+}
+
+/** 仅可写管理员 —— 写操作专用 */
+async function isWriteAdmin(request, env) {
+  return (await getAdminRole(request, env)) === 'write';
 }
 
 function isValidSlug(slug) {
   return slug?.length >= 1 && slug.length <= 64 && /^[a-zA-Z0-9_\-.~]+$/.test(slug);
 }
 
-export { decodeJWTPayload, getUserId, isAdmin, isValidSlug, isApiKeyRequest, bearerToken };
+export { decodeJWTPayload, getUserId, isAdmin, isWriteAdmin, getAdminRole, adminRoleFor, isValidSlug, isApiKeyRequest, bearerToken };

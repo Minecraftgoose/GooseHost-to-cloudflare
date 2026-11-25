@@ -15,6 +15,8 @@
  *
  * 数据来源：后端按 Supabase Auth Admin API 重写，用户字段直接来自 user 对象。
  * 会话：沿用全站 /auth-session.js 的 GHAuth.apiFetch（带自动续期与跨标签页锁）。
+ * 只读管理员：/api/me 返回 adminRole='readonly' 时隐藏全部写入口，并在 api() 里
+ *             兜底拦截非 GET 请求。服务端才是权限边界，详见《只读管理员接入说明.md》。
  * ===================================================================== */
 (function () {
     'use strict';
@@ -28,6 +30,10 @@
     // 但删除其实已经在服务端完成——刷新就能看到。这里给慢接口 3 分钟。
     const LONG_TIMEOUT_MS = 180000;
     const LONG_TIMEOUT_RE = /^\/api\/admin\/(batch-sites|batch-users|delete-site|delete-user|ban-user|cleanup-orphans|sync-emails)/;
+
+    // 当前账号的管理员角色：'write' | 'readonly' | null。
+    // 由 init() 从 /api/me 拉取后赋值；服务端才是真正的权限边界，这里只做体验与兜底。
+    let adminRole = null;
 
     const view = document.getElementById('view');
     const crumbEl = document.getElementById('breadcrumb');
@@ -176,6 +182,14 @@
         const token = localStorage.getItem('sb_token');
         if (!token) { location.href = '../login/'; throw new Error('请先登录'); }
         const method = (opts.method || 'GET').toUpperCase();
+        // 只读管理员：前端兜底。所有写请求都从这里发，一处拦住即可覆盖今后新增的操作。
+        // 真正的权限边界在服务端（api/index.js 闸门 + 各 handler 的 requireWriteAdmin*），
+        // 这里只是避免「按钮没隐藏干净 → 发请求 → 403 → 弹一堆错」的糟糕体验。
+        if (adminRole === 'readonly' && method !== 'GET') {
+            const e = new Error('只读管理员仅可查看，不能执行写操作');
+            e.status = 403;
+            throw e;
+        }
         let url = API_URL + path;
         if (forceRefresh && method === 'GET') {
             url += (url.indexOf('?') >= 0 ? '&' : '?') + 'refresh=1';
@@ -1536,21 +1550,34 @@
      * 初始化
      * ------------------------------------------------------------------ */
 
-    async function loadAdminNickname() {
+    async function loadAdminIdentity() {
         try {
             const token = localStorage.getItem('sb_token');
             if (!token) return;
-            const res = await GHAuth.apiFetch(API_URL + '/api/me', { headers: { Authorization: 'Bearer ' + token } });
+            // 短超时：角色只影响界面，不该让 /api/me 抖动拖住整个后台首屏。
+            // 失败时 adminRole 保持 null（按钮照常显示），服务端两层防线仍会拦住越权写操作。
+            const res = await GHAuth.apiFetch(API_URL + '/api/me', {
+                headers: { Authorization: 'Bearer ' + token },
+                timeoutMs: 5000
+            });
             if (!res.ok) return;
             const d = await res.json();
             const el = document.getElementById('adminNickname');
             if (el) el.textContent = d.nickname || d.email || '管理员';
-        } catch (_) { /* 昵称仅展示，失败不影响后台 */ }
+            adminRole = d.adminRole || null;
+            if (adminRole === 'readonly') {
+                document.body.classList.add('gh-readonly');
+                const badge = document.getElementById('adminRoleBadge');
+                if (badge) badge.hidden = false;
+            }
+        } catch (_) { /* 昵称与角色仅展示，失败不影响后台 */ }
     }
 
     async function init() {
         if (!localStorage.getItem('sb_token')) { location.href = '../login/'; return; }
-        loadAdminNickname();
+        // 必须 await：角色回来之前不能渲染，否则只读管理员会先看到满屏写按钮再突然消失，
+        // 也可能在角色就绪前点出一次写请求（那时 api() 还拦不住）。
+        await loadAdminIdentity();
         if (!location.hash || location.hash === '#') {
             history.replaceState(null, '', location.pathname + location.search + '#/overview');
         }

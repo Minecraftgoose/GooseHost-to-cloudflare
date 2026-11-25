@@ -9,7 +9,7 @@
 // 否则视为孤儿。路径段数不足、owner_id 不是 UUID 的对象一律跳过，避免误删桶内其它数据。
 // 必须走 Storage API 删除，禁止直接 DELETE storage.objects。
 
-import { isAdmin } from '../utils/jwt.js';
+import { isWriteAdmin } from '../utils/jwt.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { jsonResp } from '../utils/response.js';
 import { listAllFiles, removePaths, bucketForType } from '../utils/storage-cleanup.js';
@@ -19,8 +19,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_GROUPS = 200;
 
 export async function handleAdminCleanupOrphans(request, env, corsHeaders) {
-  if (!await isAdmin(request, env)) {
-    return jsonResp({ error: 'Admin only' }, 403, corsHeaders);
+  if (!await isWriteAdmin(request, env)) {
+    return jsonResp({ error: '只读管理员仅可查看，不能执行写操作' }, 403, corsHeaders);
   }
 
   let opts = {};

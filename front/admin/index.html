@@ -6,21 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理后台 - GooseHost</title>
     <link rel="icon" type="image/x-icon" href="../icons/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32x32.png?v=20261114b">
-    <link rel="icon" type="image/png" sizes="16x16" href="../icons/icon-16x16.png?v=20261114b">
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32x32.png?v=20261125b">
+    <link rel="icon" type="image/png" sizes="16x16" href="../icons/icon-16x16.png?v=20261125b">
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- 版本号：Cloudflare Pages / 浏览器会缓存不带版本的 app.js，
          导致改了代码但页面仍跑旧脚本（表头问题就是这么来的）。每次改前端必须升版本。 -->
-    <link rel="stylesheet" href="style.css?v=20261114b">
+    <link rel="stylesheet" href="style.css?v=20261125b">
     <!-- 全站圆角一律 6px，禁止大圆角/胶囊圆角 -->
-    <link rel="stylesheet" href="../theme.css?v=20261114b">
+    <link rel="stylesheet" href="../theme.css?v=20261125b">
 </head>
 <body>
     <div class="gh-shell">
         <aside class="gh-sidebar" id="sidebar">
             <div class="gh-brand">
-                <img src="../icons/icon-64x64.png?v=20261114b" srcset="../icons/icon-128x128.png?v=20261114b 2x"
+                <img src="../icons/icon-64x64.png?v=20261125b" srcset="../icons/icon-128x128.png?v=20261125b 2x"
                      width="30" height="30" alt="GooseHost" onerror="this.style.display='none'">
                 <div class="gh-brand-text"><strong>GooseHost</strong><span>管理后台</span></div>
             </div>
@@ -38,7 +38,7 @@
                 <a class="gh-nav-item" data-nav="blocks" href="#/blocks"><i class="fas fa-shield-halved"></i><span>封锁规则</span></a>
             </nav>
             <div class="gh-sidebar-foot">
-                <div class="gh-sidebar-note">数据源：Postgres RPC<br>auth.users ⋈ gh_site / Storage<br><span class="gh-build">build 20261114b</span></div>
+                <div class="gh-sidebar-note">数据源：Postgres RPC<br>auth.users ⋈ gh_site / Storage<br><span class="gh-build">build 20261125b</span></div>
                 <a href="/dashboard" class="gh-nav-item"><i class="fas fa-arrow-left"></i><span>返回面板</span></a>
             </div>
         </aside>
@@ -48,6 +48,7 @@
                 <button class="gh-icon-btn gh-menu-btn" data-action="toggle-sidebar" aria-label="展开导航"><i class="fas fa-bars"></i></button>
                 <div class="gh-crumb" id="breadcrumb"></div>
                 <div class="gh-top-actions">
+                    <span class="gh-role-badge" id="adminRoleBadge" hidden><i class="fas fa-eye"></i> 只读管理员</span>
                     <span class="gh-admin"><i class="fas fa-user-shield"></i> <span id="adminNickname">…</span></span>
                     <a class="gh-top-link" href="https://status.goose.cc.cd/" target="_blank" rel="noopener"><i class="fas fa-server"></i> 系统状态</a>
                 </div>
@@ -61,8 +62,8 @@
     </div>
     <div class="gh-toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/auth-session.js?v=20261114b"></script>
-    <script src="app.js?v=20261114b"></script>
-    <script src="../theme.js?v=20261114b"></script>
+    <script src="/auth-session.js?v=20261125b"></script>
+    <script src="app.js?v=20261125b"></script>
+    <script src="../theme.js?v=20261125b"></script>
 </body>
 </html>

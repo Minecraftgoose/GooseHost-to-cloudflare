@@ -15,7 +15,7 @@
 // 若函数缺失，rpc() 会抛出带 migrationHint 的错误，handler 统一返回 503 指引，
 // 而不是静默退化回全量扫描。
 
-import { isAdmin, getUserId } from './jwt.js';
+import { isAdmin, isWriteAdmin, getAdminRole, getUserId } from './jwt.js';
 import { jsonResp } from './response.js';
 import { getPublicBaseUrl } from './site-url.js';
 
@@ -40,7 +40,12 @@ export async function rpc(supabase, fn, args = {}) {
   throw err;
 }
 
-/** 统一管理员鉴权，返回 Response 表示已拒绝 */
+const READONLY_DENIED = '只读管理员仅可查看，不能执行写操作';
+
+/**
+ * 只读接口鉴权：可写管理员 + 只读管理员都放行。
+ * 所有 GET 类 admin 接口继续用它，行为与加只读角色之前完全一致。
+ */
 export async function requireAdmin(request, env, corsHeaders) {
   if (!await isAdmin(request, env)) {
     return jsonResp({ error: 'Admin only' }, 403, corsHeaders);
@@ -49,17 +54,34 @@ export async function requireAdmin(request, env, corsHeaders) {
 }
 
 /**
- * 管理员鉴权 + 当前操作者 UID（只解析一次会话）。
- * 所有 admin 入口应优先用它，避免 isAdmin() 与 getUserId() 各发一次校验请求。
+ * 写接口鉴权：仅可写管理员放行。
+ * 这是 handler 内的第二道防线；第一道是 api/index.js 管理员路由段的统一闸门。
  */
-export async function requireAdminContext(request, env, corsHeaders) {
-  const adminId = await getUserId(request, env);
-  const adminIds = (env?.ADMIN_USER_IDS || '').split(',').filter(Boolean);
-  if (!adminId || !adminIds.includes(adminId)) {
-    return { denied: jsonResp({ error: 'Admin only' }, 403, corsHeaders), adminId: null };
+export async function requireWriteAdmin(request, env, corsHeaders) {
+  if (!await isWriteAdmin(request, env)) {
+    const role = await getAdminRole(request, env);
+    return jsonResp({ error: role === 'readonly' ? READONLY_DENIED : 'Admin only' }, 403, corsHeaders);
   }
+  return null;
+}
+
+/**
+ * 写操作鉴权 + 当前操作者 UID（一次会话解析出角色与 UID，避免两次校验请求）。
+ * 供需要 adminId 做「不能删自己」判断的接口使用。
+ */
+export async function requireWriteAdminContext(request, env, corsHeaders) {
+  const role = await getAdminRole(request, env);
+  if (role !== 'write') {
+    const msg = role === 'readonly' ? READONLY_DENIED : 'Admin only';
+    return { denied: jsonResp({ error: msg }, 403, corsHeaders), adminId: null };
+  }
+  // adminId 仍要拿，用于 SELF_BLOCK 自锁判断；getUserId 命中 20s 缓存，无额外网络往返
+  const adminId = await getUserId(request, env);
   return { denied: null, adminId };
 }
+
+/** 兼容旧调用点：语义已收敛为「写操作专用」，等价于 requireWriteAdminContext */
+export const requireAdminContext = requireWriteAdminContext;
 
 /** URL 查询参数 → 分页（page 从 1 开始，也兼容 offset） */
 export function pager(sp, { defLimit = 25, maxLimit = 100 } = {}) {

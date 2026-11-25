@@ -286,3 +286,67 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
     .gh-admin { display: none; }
     .gh-crumb .gh-crumb-cur { max-width: 140px; }
 }
+
+/* ==================================================================
+ * 只读管理员模式
+ *
+ * body.gh-readonly 由 app.js 在 /api/me 返回 adminRole='readonly' 时加上。
+ * 这里只负责「让界面看起来就是只读的」：隐藏一切会触发写请求的入口。
+ *
+ * 安全边界不在这里 —— 服务端 api/index.js 的统一闸门会拒绝所有非 GET 的
+ * /api/admin/* 请求，各写接口 handler 内还有 requireWriteAdmin* 第二道校验。
+ * 即使有人手动删掉这个 class、或从控制台直接 fetch，也改不了任何东西。
+ * ================================================================== */
+.gh-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border: 1px solid var(--gh-a-warn);
+    border-radius: var(--gh-r);
+    background: var(--gh-a-warn-soft);
+    color: var(--gh-a-warn);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.gh-role-badge[hidden] { display: none; }
+
+/* 逐个列出写操作入口。保留：reload / page / 搜索 / 排序 / 展开目录 / 查看详情 /
+   复制 / 外链 / 分页 / 弹窗关闭 / 广场切 tab / 命中日志查看 / 勾选（无害）。
+   新增写按钮时记得补进来；漏一个也只是「按钮可见但点了被前端与服务端拦下」，
+   不会造成越权。 */
+body.gh-readonly [data-action="batch-delete-users"],
+body.gh-readonly [data-action="batch-delete-sites"],
+body.gh-readonly [data-action="batch-ban"],
+body.gh-readonly [data-action="batch-unban"],
+body.gh-readonly [data-action="ban-confirm"],
+body.gh-readonly [data-action="ban-user"],
+body.gh-readonly [data-action="unban-user"],
+body.gh-readonly [data-action="delete-user"],
+body.gh-readonly [data-action="delete-site"],
+body.gh-readonly [data-action="edit-site-content"],
+body.gh-readonly [data-action="editor-save"],
+body.gh-readonly [data-action="block-add"],
+body.gh-readonly [data-action="block-edit"],
+body.gh-readonly [data-action="block-save"],
+body.gh-readonly [data-action="block-delete"],
+body.gh-readonly [data-action="block-toggle"],
+body.gh-readonly [data-action="block-refresh"],
+body.gh-readonly [data-action="modal-confirm"],
+body.gh-readonly [data-action="proj-file-edit"],
+body.gh-readonly [data-action="proj-file-replace"],
+body.gh-readonly [data-action="proj-file-delete"],
+body.gh-readonly [data-action="delete-play-post"],
+body.gh-readonly [data-action="delete-play-comment"],
+body.gh-readonly [data-action="publish-announcement"],
+body.gh-readonly [data-action="clear-announcement"],
+body.gh-readonly [data-action="sync-emails"],
+body.gh-readonly [data-action="orphan-preview"],
+body.gh-readonly [data-action="orphan-run"] {
+    display: none !important;
+}
+
+@media (max-width: 620px) {
+    .gh-role-badge { padding: 2px 6px; font-size: 11px; }
+}

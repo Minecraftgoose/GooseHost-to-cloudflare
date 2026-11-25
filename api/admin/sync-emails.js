@@ -8,10 +8,10 @@
 import { jsonResp } from '../utils/response.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { saveEmailMap } from '../utils/email-map.js';
-import { requireAdmin, emailMapFromDb } from '../utils/admin-data.js';
+import { requireWriteAdmin, emailMapFromDb } from '../utils/admin-data.js';
 
 export async function handleAdminSyncEmails(request, env, corsHeaders) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const denied = await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
 
   try {

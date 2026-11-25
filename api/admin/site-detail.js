@@ -11,7 +11,7 @@ import { jsonResp } from '../utils/response.js';
 import { makeSupabase, storageUrl } from '../utils/supabase.js';
 import { listAllFileItems } from '../utils/storage-cleanup.js';
 import {
-  requireAdmin, publicUser, siteView, getUserBriefs,
+  requireAdmin, requireWriteAdmin, publicUser, siteView, getUserBriefs,
 } from '../utils/admin-data.js';
 
 // 宽松校验：支持中文、字母、数字、_ - . ~ /，长度 1~128
@@ -100,7 +100,7 @@ export async function handleAdminSiteDetail(request, env, corsHeaders, slugEncod
 }
 
 export async function handleAdminSiteUpdate(request, env, corsHeaders, slugEncoded) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const denied = await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
 
   const slug = decodeSlug(slugEncoded);

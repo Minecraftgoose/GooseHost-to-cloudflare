@@ -2,7 +2,7 @@
 
 import { jsonResp } from '../utils/response.js';
 import { makeSupabase } from '../utils/supabase.js';
-import { requireAdmin } from '../utils/admin-data.js';
+import { requireAdmin, requireWriteAdmin } from '../utils/admin-data.js';
 
 // GET /api/announcement - 公开：当前生效公告
 export async function handleGetAnnouncement(request, env, corsHeaders) {
@@ -46,7 +46,7 @@ export async function handleAdminGetAnnouncement(request, env, corsHeaders) {
 // POST /api/admin/announcement - 发布 / 清除
 // body: { action: 'set' | 'clear', content?: string }
 export async function handleAdminAnnouncement(request, env, corsHeaders) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const denied = await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
 
   let body;

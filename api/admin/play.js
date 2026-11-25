@@ -10,7 +10,7 @@ import { jsonResp } from '../utils/response.js';
 import { makeSupabase } from '../utils/supabase.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import {
-  requireAdmin, pager, cleanSearch, pagePayload,
+  requireAdmin, requireWriteAdmin, pager, cleanSearch, pagePayload,
   getUserBriefs,
 } from '../utils/admin-data.js';
 
@@ -245,7 +245,7 @@ export async function handleAdminPlayPostDetail(request, env, corsHeaders, postI
 }
 
 export async function handleAdminDeletePlayPost(request, env, corsHeaders, postId) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const denied = await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
   await checkRateLimit(request, env, 'normal');
 
@@ -283,7 +283,7 @@ export async function handleAdminDeletePlayPost(request, env, corsHeaders, postI
 }
 
 export async function handleAdminDeletePlayComment(request, env, corsHeaders, commentId) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const denied = await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
   await checkRateLimit(request, env, 'normal');
 

@@ -12,7 +12,7 @@
 
 import { jsonResp } from '../utils/response.js';
 import { makeSupabase } from '../utils/supabase.js';
-import { requireAdmin, rpc } from '../utils/admin-data.js';
+import { requireAdmin, requireWriteAdmin, rpc } from '../utils/admin-data.js';
 import { checkRateLimit } from '../utils/rate-limit.js';
 import {
   normalizeRule, hitsSafeList, BLOCK_SNAPSHOT_KEY, peekBlockSnapshot,
@@ -43,12 +43,15 @@ async function readBody(request) {
 }
 
 export async function handleAdminBlockRules(request, env, corsHeaders, subPath) {
-  const denied = await requireAdmin(request, env, corsHeaders);
+  const method = request.method;
+  // GET 看规则 / 命中日志：只读管理员放行；其余（新增、编辑、删除、refresh）一律要写权限。
+  const denied = method === 'GET'
+    ? await requireAdmin(request, env, corsHeaders)
+    : await requireWriteAdmin(request, env, corsHeaders);
   if (denied) return denied;
   await checkRateLimit(request, env, 'normal');
 
   const supabase = makeSupabase(env);
-  const method = request.method;
 
   try {
     // ---- 命中日志 ----
