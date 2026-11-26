@@ -21,7 +21,7 @@ ADMIN_USER_IDS = "de90a631-30b0-4b4a-afe4-dba9dd72e288,4ee286ea-945e-44ad-8513-6
 # 只读管理员（只能看后台，所有写操作 403）：同样是逗号分隔的 UID。
 # 不填或留空 = 不启用该功能，现有行为完全不变。
 # 同一个 UID 若误填进两份名单，按「只读」处理（取权限更小的一方）。
-ADMIN_READONLY_USER_IDS = "b45f7838-f6a4-45d6-a8a2-af4e363ce5c2,c6e486a2-89cb-4728-88ff-ca6bebc9d378"
+ADMIN_READONLY_USER_IDS = "b45f7838-f6a4-45d6-a8a2-af4e363ce5c2,c6e486a2-89cb-4728-88ff-ca6bebc9d378,17d2494a-d7df-4911-a740-8b7c6135b15d"
 
 AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 AI_MODEL = "glm-4.7-flash,glm-4.6,glm-4-flash"
