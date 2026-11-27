@@ -61,7 +61,7 @@
     <!-- 全部用根绝对路径：本页会被 200 rewrite 到 /dashboard/deploy、/dashboard/mysite/xxx 等
          不同深度的 URL，相对路径会随地址栏变化而解析错。带 ?v= 的资源在 _headers 里长缓存，
          改内容时把版本号 +1 即可让浏览器拿新文件。 -->
-    <link rel="stylesheet" href="/dashboard/style.css?v=20261127">
+    <link rel="stylesheet" href="/dashboard/style.css?v=20261129">
     <link rel="stylesheet" href="/dashboard/copilot.css?v=20261125">
     <link rel="stylesheet" href="/theme.css?v=20261125">
 </head>
@@ -78,6 +78,7 @@
     <div id="bgLayer" class="bg-layer"></div>
     <!-- 底部悬浮 tab 栏 -->
     <nav class="gh-tabbar" id="ghTabbar" aria-label="主导航">
+        <span class="gh-tab-pill" id="ghTabPill" aria-hidden="true"></span>
         <button class="gh-tab" type="button" data-tab="playground" onclick="navigateTab('playground')" title="广场" aria-label="广场">
             <i class="fas fa-comments" aria-hidden="true"></i><span class="gh-tab-label">广场</span>
         </button>
@@ -693,7 +694,7 @@
 
     <script type="module" src="/squircle.js?v=20261125"></script>
     <script src="/auth-session.js?v=20261125"></script>
-    <script src="/dashboard/app.js?v=20261127"></script>
+    <script src="/dashboard/app.js?v=20261129"></script>
     <!-- showcase.js 是加图时唯一要动的文件，故意不带版本号：
          _headers 对它用 must-revalidate，改完刷新就生效，不用同步改 index.html。 -->
     <script src="/dashboard/showcase.js"></script>

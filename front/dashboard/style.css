@@ -2041,7 +2041,7 @@
             gap: 2px;
             padding: 6px;
             border: 1px solid rgba(2, 255, 142, 0.22);
-            border-radius: 22px;
+            border-radius: 999px;
             background: rgba(10, 20, 15, 0.94);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
@@ -2060,9 +2060,10 @@
             gap: 4px;
             padding: 0 2px;
             border: 0;
-            border-radius: 16px;
+            border-radius: 999px;
             background: transparent;
             color: rgba(255, 255, 255, 0.58);
+            z-index: 1;
             font-family: inherit;
             cursor: pointer;
             overflow: hidden;
@@ -2070,7 +2071,23 @@
         }
         .gh-tab:hover { color: rgba(255, 255, 255, 0.92); background: rgba(2, 255, 142, 0.08); }
         .gh-tab:focus-visible { outline: 2px solid var(--accent, #02ff8e); outline-offset: -2px; }
-        .gh-tab.active { color: #02ff8e; background: rgba(2, 255, 142, 0.14); }
+        .gh-tab.active { color: #02ff8e; background: transparent; }
+        .gh-tab.active:hover { background: transparent; }
+
+        .gh-tab-pill {
+            position: absolute;
+            top: 6px;
+            left: 0;
+            height: calc(100% - 12px);
+            width: 0;
+            border: 1px solid rgba(2, 255, 142, 0.34);
+            border-radius: 999px;
+            background: rgba(2, 255, 142, 0.16);
+            box-shadow: 0 0 18px rgba(2, 255, 142, 0.10);
+            pointer-events: none;
+            z-index: 0;
+            transition: transform 0.34s var(--ease-out), width 0.34s var(--ease-out);
+        }
         .gh-tab i { font-size: 20px; line-height: 1; }
         .gh-tab svg { width: 20px; height: 20px; flex: none; }
         .gh-tab-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
@@ -2082,15 +2099,30 @@
         }
         html[data-theme="light"] .gh-tab { color: #57606a; }
         html[data-theme="light"] .gh-tab:hover { color: #1f2328; background: rgba(0, 122, 66, 0.07); }
-        html[data-theme="light"] .gh-tab.active { color: #007a42; background: rgba(0, 122, 66, 0.12); }
+        html[data-theme="light"] .gh-tab.active { color: #007a42; background: transparent; }
+        html[data-theme="light"] .gh-tab.active:hover { background: transparent; }
+        html[data-theme="light"] .gh-tab-pill {
+            background: rgba(0, 122, 66, 0.12);
+            border-color: rgba(0, 122, 66, 0.28);
+            box-shadow: none;
+        }
 
+        #page-playground {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            width: 100vw;
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            transform: none;
+        }
         .gh-play-frame {
             display: block;
-            width: 100%;
-            height: calc(100dvh - 170px);
-            min-height: 420px;
-            border: 1px solid var(--border, rgba(2, 255, 142, 0.15));
-            border-radius: 18px;
+            width: 100vw;
+            height: 100dvh;
+            border: 0;
+            border-radius: 0;
             background: #0a0f0d;
         }
 
@@ -2104,5 +2136,5 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .gh-tab { transition: none; }
+            .gh-tab, .gh-tab-pill { transition: none; }
         }

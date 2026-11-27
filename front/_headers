@@ -1,6 +1,6 @@
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
+  X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
@@ -103,24 +103,18 @@
   Cache-Control: public, max-age=0, must-revalidate
   ! X-Content-Type-Options
   X-Content-Type-Options: nosniff
-  ! X-Frame-Options
-  X-Frame-Options: SAMEORIGIN
 
 /playground/
   Content-Type: text/html; charset=utf-8
   Cache-Control: public, max-age=0, must-revalidate
   ! X-Content-Type-Options
   X-Content-Type-Options: nosniff
-  ! X-Frame-Options
-  X-Frame-Options: SAMEORIGIN
 
 /playground/index.html
   Content-Type: text/html; charset=utf-8
   Cache-Control: public, max-age=0, must-revalidate
   ! X-Content-Type-Options
   X-Content-Type-Options: nosniff
-  ! X-Frame-Options
-  X-Frame-Options: SAMEORIGIN
 
 /playground/*.css
   Cache-Control: public, max-age=0, must-revalidate

@@ -112,7 +112,8 @@
             if (page === 'me') loadTokens();
             if (page === 'deploy') updateEditorVisibility();
 
-            updateTabbar(page);
+            const tabKey = updateTabbar(page);
+            animatePageIn(target, tabKey);
             runPageTypewriter(page);
 
             if (page === 'deploy') {
@@ -170,35 +171,78 @@
 
         /* 首页与部署共用一个 tab：概览时显示部署，其余页面显示首页 */
         const TAB_PAGES = { playground: 'playground', copilot: 'copilot', sites: 'sites', me: 'me' };
+        const TAB_ORDER = ['playground', 'copilot', 'home', 'sites', 'me'];
+        const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let lastTabKey = 'home';
+        let navReady = false;
 
         function navigateTab(tab) {
             if (tab === 'home') return navigateTo(currentPage === 'overview' ? 'deploy' : 'overview');
             navigateTo(TAB_PAGES[tab] || 'overview');
         }
 
+        function tabKeyFor(page) {
+            if (page === 'overview' || page === 'deploy') return 'home';
+            if (page === 'sites' || page === 'detail') return 'sites';
+            if (page === 'me' || page === 'preferences' || page === 'account') return 'me';
+            return page;
+        }
+
+        function positionPill(tabKey, animate) {
+            const bar = document.getElementById('ghTabbar');
+            const pill = document.getElementById('ghTabPill');
+            const tab = bar && bar.querySelector('.gh-tab[data-tab="' + tabKey + '"]');
+            if (!bar || !pill || !tab) return;
+            const b = bar.getBoundingClientRect();
+            const t = tab.getBoundingClientRect();
+            const border = parseFloat(getComputedStyle(bar).borderLeftWidth) || 0;
+            if (!animate) pill.style.transition = 'none';
+            pill.style.width = t.width + 'px';
+            pill.style.transform = 'translateX(' + (t.left - b.left - border) + 'px)';
+            if (!animate) { void pill.offsetWidth; pill.style.transition = ''; }
+        }
+
+        function animatePageIn(pageEl, tabKey) {
+            if (!navReady) { navReady = true; lastTabKey = tabKey; return; }
+            const dir = TAB_ORDER.indexOf(tabKey) >= TAB_ORDER.indexOf(lastTabKey) ? 1 : -1;
+            lastTabKey = tabKey;
+            if (REDUCE_MOTION.matches || !pageEl || !pageEl.animate) return;
+            const frames = pageEl.id === 'page-playground'
+                ? [{ opacity: 0 }, { opacity: 1 }]
+                : [{ opacity: 0, transform: 'translate(' + (dir * 22) + 'px, 8px)' },
+                   { opacity: 1, transform: 'translate(0, 0)' }];
+            pageEl.animate(frames, { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+        }
+
         function updateTabbar(page) {
+            const tabKey = tabKeyFor(page);
             document.querySelectorAll('.gh-tab').forEach(t => t.classList.remove('active'));
-            const activeTab = (page === 'overview' || page === 'deploy') ? 'home'
-                : (page === 'sites' || page === 'detail') ? 'sites'
-                : (page === 'me' || page === 'preferences' || page === 'account') ? 'me'
-                : page;
-            const el = document.querySelector('.gh-tab[data-tab="' + activeTab + '"]');
+            const el = document.querySelector('.gh-tab[data-tab="' + tabKey + '"]');
             if (el) el.classList.add('active');
+            positionPill(tabKey, navReady);
 
             const home = document.getElementById('tabHome');
-            if (!home) return;
+            if (!home) return tabKey;
             const onOverview = page === 'overview';
             home.innerHTML = onOverview
                 ? '<i class="fas fa-rocket" aria-hidden="true"></i><span class="gh-tab-label">部署</span>'
                 : '<i class="fas fa-home" aria-hidden="true"></i><span class="gh-tab-label">首页</span>';
             home.title = onOverview ? '部署' : '首页';
             home.setAttribute('aria-label', home.title);
+            return tabKey;
         }
 
         function loadPlayFrame() {
             const f = document.getElementById('playFrame');
             if (f && !f.getAttribute('src') && f.dataset.src) f.setAttribute('src', f.dataset.src);
         }
+
+        function currentTabKey() {
+            const active = document.querySelector('.gh-tab.active');
+            return active ? active.dataset.tab : 'home';
+        }
+        window.addEventListener('resize', function () { positionPill(currentTabKey(), false); });
+        requestAnimationFrame(function () { positionPill(currentTabKey(), false); });
 
         function showToast(msg, type = 'success') {
             const t = document.getElementById('toast');
