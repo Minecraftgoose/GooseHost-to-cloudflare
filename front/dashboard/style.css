@@ -2024,3 +2024,85 @@
             .gh-showcase-track { scroll-behavior: auto; }
             .gh-showcase-arrow, .gh-showcase, .gh-showcase-dot { transition: none; }
         }
+
+        /* ===== 底部悬浮 tab 栏 ===== */
+        .main-layout { padding-top: 0; padding-bottom: 120px; }
+        .content { padding-bottom: 1rem; }
+
+        .gh-tabbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(560px, calc(100% - 32px));
+            height: 64px;
+            display: flex;
+            align-items: stretch;
+            gap: 2px;
+            padding: 6px;
+            border: 1px solid rgba(2, 255, 142, 0.22);
+            border-radius: 22px;
+            background: rgba(10, 20, 15, 0.94);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            z-index: 900;
+        }
+
+        .gh-tab {
+            position: relative;
+            flex: 1 1 0;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 0 2px;
+            border: 0;
+            border-radius: 16px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.58);
+            font-family: inherit;
+            cursor: pointer;
+            overflow: hidden;
+            transition: color 0.18s ease, background 0.18s ease;
+        }
+        .gh-tab:hover { color: rgba(255, 255, 255, 0.92); background: rgba(2, 255, 142, 0.08); }
+        .gh-tab:focus-visible { outline: 2px solid var(--accent, #02ff8e); outline-offset: -2px; }
+        .gh-tab.active { color: #02ff8e; background: rgba(2, 255, 142, 0.14); }
+        .gh-tab i { font-size: 20px; line-height: 1; }
+        .gh-tab svg { width: 20px; height: 20px; flex: none; }
+        .gh-tab-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
+
+        html[data-theme="light"] .gh-tabbar {
+            background: rgba(255, 255, 255, 0.94);
+            border-color: rgba(0, 0, 0, 0.10);
+            box-shadow: 0 12px 40px rgba(16, 35, 26, 0.16);
+        }
+        html[data-theme="light"] .gh-tab { color: #57606a; }
+        html[data-theme="light"] .gh-tab:hover { color: #1f2328; background: rgba(0, 122, 66, 0.07); }
+        html[data-theme="light"] .gh-tab.active { color: #007a42; background: rgba(0, 122, 66, 0.12); }
+
+        .gh-play-frame {
+            display: block;
+            width: 100%;
+            height: calc(100dvh - 170px);
+            min-height: 420px;
+            border: 1px solid var(--border, rgba(2, 255, 142, 0.15));
+            border-radius: 18px;
+            background: #0a0f0d;
+        }
+
+        @media (max-width: 420px) {
+            .gh-tabbar { height: 56px; bottom: 18px; }
+            .gh-tab-label { display: none; }
+        }
+
+        @media (max-width: 640px) {
+            html[data-page="dashboard"] .gh-theme-toggle { bottom: 92px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .gh-tab { transition: none; }
+        }

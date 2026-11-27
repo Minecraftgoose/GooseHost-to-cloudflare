@@ -14,6 +14,8 @@
 /dashboard/account /dashboard/ 200
 /dashboard/copilot /dashboard/ 200
 /dashboard/preferences /dashboard/ 200
+/dashboard/playground /dashboard/ 200
+/dashboard/me /dashboard/ 200
 /dashboard.html /dashboard/ 301
 
 # ---------- 其他 SPA ----------

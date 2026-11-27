@@ -61,7 +61,7 @@
     <!-- 全部用根绝对路径：本页会被 200 rewrite 到 /dashboard/deploy、/dashboard/mysite/xxx 等
          不同深度的 URL，相对路径会随地址栏变化而解析错。带 ?v= 的资源在 _headers 里长缓存，
          改内容时把版本号 +1 即可让浏览器拿新文件。 -->
-    <link rel="stylesheet" href="/dashboard/style.css?v=20261126">
+    <link rel="stylesheet" href="/dashboard/style.css?v=20261127">
     <link rel="stylesheet" href="/dashboard/copilot.css?v=20261125">
     <link rel="stylesheet" href="/theme.css?v=20261125">
 </head>
@@ -76,73 +76,28 @@
         <div class="welcome-text" id="welcomeText"></div>
     </div>
     <div id="bgLayer" class="bg-layer"></div>
-    <!-- 顶部导航栏 -->
-    <nav class="navbar">
-        <!-- 竖屏：左侧 SVG Logo -->
-        <div class="navbar-icon" id="navLogo">
-            <img src="/logo.svg" height="28" alt="GooseHost">
-        </div>
-
-        <!-- ===== 导航菜单（宽屏常驻横排 / 竖屏由三道杠展开） ===== -->
-        <div class="sidebar" id="sidebar" role="menu" aria-label="主菜单">
-            <div class="nav-section">
-                <div class="nav-section-title">主菜单</div>
-                <div class="nav-item active" data-page="overview" onclick="navigateTo('overview')" role="button" tabindex="0" title="概览"><i class="fas fa-home"></i>
-                    <span>概览</span>
-                </div>
-                <div class="nav-item" data-page="deploy" onclick="navigateTo('deploy')" role="button" tabindex="0" title="部署"><i class="fas fa-rocket"></i>
-                    <span>部署</span>
-                </div>
-                <div class="nav-item" title="AI Copilot" data-page="copilot" onclick="navigateTo('copilot')" role="button" tabindex="0">
-                    <!--
-                      Bot 图标：与 copilot.js 的 botIcon() **图形完全一致**，
-                      只是尺寸不同（这里 18px 匹配 nav-item 的 1rem 图标槽位）。
-                      必须内联而非 JS 注入 —— 导航栏菜单首屏就要渲染，
-                      靠 JS 替换会先闪一下旧图标。
-                      图形一致性由 tests/test-bot-icon.mjs 守着。
-                    -->
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="18" height="18" fill="none">
-                        <!-- 上回环断线 -->
-                        <path d="M 50 10 H 20 C 20 10 10 10 10 50" stroke="currentColor" stroke-width="10" stroke-linecap="square" />
-                        <!-- 下回环断线 -->
-                        <path d="M 50 90 H 80 C 80 90 90 90 90 50" stroke="currentColor" stroke-width="10" stroke-linecap="square" />
-                        <!-- 中心汇聚点 -->
-                        <circle cx="50" cy="50" r="5" fill="currentColor" />
-                    </svg>
-                    <span>AI Copilot</span>
-                </div>
-                <div class="nav-item" data-page="sites" onclick="navigateTo('sites')" role="button" tabindex="0" title="我的网站"><i class="fas fa-globe"></i>
-                    <span>我的网站</span>
-                </div>
-                <div class="nav-item" onclick="location.href='/playground/'" role="button" tabindex="0" title="广场"><i class="fas fa-comments"></i>
-                    <span>广场</span>
-                </div>
-            </div>
-
-            <div class="nav-divider"></div>
-
-            <div class="nav-section">
-                <div class="nav-section-title">设置</div>
-                <div class="nav-item" data-page="preferences" onclick="navigateTo('preferences')" role="button" tabindex="0" title="偏好设置"><i class="fas fa-sliders-h"></i>
-                    <span>偏好设置</span>
-                </div>
-                <div class="nav-item" data-page="account" onclick="navigateTo('account')" role="button" tabindex="0" title="账户"><i class="fas fa-user-circle"></i>
-                    <span>账户</span>
-                </div>
-                <a href="https://status.goose.cc.cd/" class="nav-item" title="系统状态" style="text-decoration: none;" target="_blank" rel="noopener">
-                    <i class="fas fa-server"></i>
-                    <span>系统状态</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- 竖屏：右侧三道杠 -->
-        <button class="menu-toggle" id="menuToggle" type="button" onclick="toggleSidebar()" aria-label="打开菜单" aria-expanded="false" aria-controls="sidebar" disabled>
-            <i class="fas fa-bars"></i>
+    <!-- 底部悬浮 tab 栏 -->
+    <nav class="gh-tabbar" id="ghTabbar" aria-label="主导航">
+        <button class="gh-tab" type="button" data-tab="playground" onclick="navigateTab('playground')" title="广场" aria-label="广场">
+            <i class="fas fa-comments" aria-hidden="true"></i><span class="gh-tab-label">广场</span>
+        </button>
+        <button class="gh-tab" type="button" data-tab="copilot" onclick="navigateTab('copilot')" title="小鹅" aria-label="小鹅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20" height="20" fill="none" aria-hidden="true">
+                <path d="M 50 10 H 20 C 20 10 10 10 10 50" stroke="currentColor" stroke-width="10" stroke-linecap="square" />
+                <path d="M 50 90 H 80 C 80 90 90 90 90 50" stroke="currentColor" stroke-width="10" stroke-linecap="square" />
+                <circle cx="50" cy="50" r="5" fill="currentColor" />
+            </svg><span class="gh-tab-label">小鹅</span>
+        </button>
+        <button class="gh-tab" type="button" data-tab="home" id="tabHome" onclick="navigateTab('home')" title="部署" aria-label="部署">
+            <i class="fas fa-rocket" aria-hidden="true"></i><span class="gh-tab-label">部署</span>
+        </button>
+        <button class="gh-tab" type="button" data-tab="sites" onclick="navigateTab('sites')" title="网站" aria-label="网站">
+            <i class="fas fa-globe" aria-hidden="true"></i><span class="gh-tab-label">网站</span>
+        </button>
+        <button class="gh-tab" type="button" data-tab="me" onclick="navigateTab('me')" title="我的" aria-label="我的">
+            <i class="fas fa-user-circle" aria-hidden="true"></i><span class="gh-tab-label">我的</span>
         </button>
     </nav>
-
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
     <!-- 主布局 -->
     <div class="main-layout" id="mainContent">
@@ -202,7 +157,7 @@
                             <i class="fas fa-list"></i>
                             <span>管理网站</span>
                         </div>
-                        <div class="quick-action splash-action" style="animation: fadeInUp 0.4s ease forwards; opacity: 0; animation-delay: 0.5s" onclick="navigateTo('preferences')">
+                        <div class="quick-action splash-action" style="animation: fadeInUp 0.4s ease forwards; opacity: 0; animation-delay: 0.5s" onclick="navigateTo('me')">
                             <i class="fas fa-cog"></i>
                             <span>设置</span>
                         </div>
@@ -407,12 +362,14 @@
                 </div>
             </div>
 
-            <!-- 偏好设置页 -->
-            <div class="page" id="page-preferences">
+            <!-- 我的：偏好设置 + 账户 + 系统状态 -->
+            <div class="page" id="page-me">
                 <div class="page-header">
-                    <h1 class="page-title tw-target" data-tw="偏好设置"></h1>
-                    <p class="page-desc tw-target" data-tw="自定义您的编辑体验"></p>
+                    <h1 class="page-title tw-target" data-tw="我的"></h1>
+                    <p class="page-desc tw-target" data-tw="偏好、账户与服务状态"></p>
                 </div>
+
+                
                 
                 <div class="card">
                     <div class="card-header">
@@ -447,14 +404,10 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            
 
-            <!-- 账户页 -->
-            <div class="page" id="page-account">
-                <div class="page-header">
-                    <h1 class="page-title tw-target" data-tw="账户设置"></h1>
-                    <p class="page-desc tw-target" data-tw="管理您的账户信息和安全设置"></p>
-                </div>
+
+                
                 
                 <div class="card">
                     <div class="card-header">
@@ -545,6 +498,28 @@
                         </button>
                     </div>
                 </div>
+            
+
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-server"></i> 系统状态</div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-title">服务运行状态</div>
+                            <div class="setting-desc">查看 API、部署与 CDN 的实时可用性</div>
+                        </div>
+                        <a class="btn btn-sm" href="https://status.goose.cc.cd/" target="_blank" rel="noopener" style="border:1px solid var(--border-focus); background:transparent; color:var(--accent);">
+                            <i class="fas fa-arrow-up-right-from-square"></i> 查看
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 广场 -->
+            <div class="page" id="page-playground">
+                <iframe class="gh-play-frame" id="playFrame" data-src="/playground/?embed=1" title="GooseHost 广场" loading="lazy"></iframe>
             </div>
 
             <!-- 站点详情页 -->
@@ -718,7 +693,7 @@
 
     <script type="module" src="/squircle.js?v=20261125"></script>
     <script src="/auth-session.js?v=20261125"></script>
-    <script src="/dashboard/app.js?v=20261125"></script>
+    <script src="/dashboard/app.js?v=20261127"></script>
     <!-- showcase.js 是加图时唯一要动的文件，故意不带版本号：
          _headers 对它用 must-revalidate，改完刷新就生效，不用同步改 index.html。 -->
     <script src="/dashboard/showcase.js"></script>

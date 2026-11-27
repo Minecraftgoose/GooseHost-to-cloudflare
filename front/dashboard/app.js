@@ -58,8 +58,11 @@
             sites: '/dashboard/mysite',
             preferences: '/dashboard/settings',
             account: '/dashboard/account',
-            copilot: '/dashboard/copilot'
+            copilot: '/dashboard/copilot',
+            playground: '/dashboard/playground',
+            me: '/dashboard/me'
         };
+        let currentPage = 'overview';
 
         /**
          * 进入部署页时，按当前选中的网站类型同步显示对应的输入区。
@@ -92,27 +95,24 @@
         }
 
         function navigateTo(page) {
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            const navItem = document.querySelector(`[data-page="${page}"]`);
-            if (navItem) navItem.classList.add('active');
-
+            currentPage = page;
             const url = ROUTES[page] || '/dashboard';
             if (location.pathname !== url) history.pushState({ page }, '', url);
 
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(`page-${page}`).classList.add('active');
+            const target = document.getElementById(`page-${page}`) || document.getElementById('page-overview');
+            target.classList.add('active');
 
             window.scrollTo(0, 0);
             document.documentElement.scrollTop = 0;
             document.body.scrollTop = 0;
-            document.getElementById('sidebar').scrollTop = 0;
 
-            closeSidebar();
-
+            if (page === 'playground') loadPlayFrame();
             if (page === 'sites') loadSites();
-            if (page === 'account') loadTokens();
+            if (page === 'me') loadTokens();
             if (page === 'deploy') updateEditorVisibility();
 
+            updateTabbar(page);
             runPageTypewriter(page);
 
             if (page === 'deploy') {
@@ -127,7 +127,7 @@
         function parseRoute() {
             const raw = location.pathname.replace(/\/+$/, '');
             if (raw === '/dashboard' || raw.endsWith('/dashboard.html')) return navigateTo('overview');
-            const m = raw.match(/^\/dashboard\/(deploy|mysite|settings|account|preferences|overview|copilot)(?:\/(.+))?$/);
+            const m = raw.match(/^\/dashboard\/(deploy|mysite|settings|account|preferences|overview|copilot|playground|me)(?:\/(.+))?$/);
             if (m) {
                 const seg = m[1];
                 const slug = m[2] ? decodeURIComponent(m[2]) : null;
@@ -135,7 +135,7 @@
                     showSiteDetail(slug);
                     return;
                 }
-                const map = { deploy: 'deploy', mysite: 'sites', settings: 'preferences', preferences: 'preferences', account: 'account', overview: 'overview', copilot: 'copilot' };
+                const map = { deploy: 'deploy', mysite: 'sites', settings: 'me', preferences: 'me', account: 'me', overview: 'overview', copilot: 'copilot', playground: 'playground', me: 'me' };
                 return navigateTo(map[seg]);
             }
             return navigateTo('overview');
@@ -168,94 +168,37 @@
         document.addEventListener('DOMContentLoaded', parseRoute);
         if (document.readyState !== 'loading') parseRoute();
 
-        /* ===== 导航菜单展开/收起 =====
-           两种形态由「屏幕方向 + 宽度」决定，CSS 与 JS 用同一条查询，避免只改一边：
+        /* 首页与部署共用一个 tab：概览时显示部署，其余页面显示首页 */
+        const TAB_PAGES = { playground: 'playground', copilot: 'copilot', sites: 'sites', me: 'me' };
 
-           横屏（含手机横放，如 844x390）：菜单常驻导航栏横排。
-               → Logo 与三道杠 display:none，且按钮 disabled + aria-hidden，
-                 点击不触发任何逻辑，也不会被 Tab 聚焦。
-           竖屏（窄屏 + 纵向，如 390x844）：左侧 Logo、右侧三道杠，点击展开竖排下拉。
-
-           路由跳转处（navigateTo / showSiteDetail）会调用 closeSidebar()，保持兼容。 */
-        const NAV_PORTRAIT_MQ = window.matchMedia('(max-width: 768px) and (orientation: portrait)');
-        const isPortraitNav = () => NAV_PORTRAIT_MQ.matches;
-
-        /* 按当前方向同步 Logo / 三道杠 / 遮罩的可用状态。
-           横屏下按钮彻底失活（display:none 只管外观，disabled 才管交互）。 */
-        function syncNavMode() {
-            const portrait = isPortraitNav();
-            const btn = document.getElementById('menuToggle');
-            const logo = document.getElementById('navLogo');
-            const overlay = document.getElementById('sidebarOverlay');
-
-            if (btn) {
-                btn.disabled = !portrait;
-                btn.setAttribute('aria-hidden', portrait ? 'false' : 'true');
-                btn.tabIndex = portrait ? 0 : -1;
-            }
-            if (logo) logo.setAttribute('aria-hidden', portrait ? 'false' : 'true');
-            if (overlay && !portrait) overlay.classList.remove('active');
-            // 横屏菜单常驻，清掉可能残留的展开态
-            if (!portrait) {
-                const sb = document.getElementById('sidebar');
-                if (sb) sb.classList.remove('open');
-            }
-            if (btn) setMenuIcon(portrait && btn.getAttribute('aria-expanded') === 'true');
+        function navigateTab(tab) {
+            if (tab === 'home') return navigateTo(currentPage === 'overview' ? 'deploy' : 'overview');
+            navigateTo(TAB_PAGES[tab] || 'overview');
         }
 
-        function setMenuIcon(open) {
-            const btn = document.getElementById('menuToggle');
-            if (!btn) return;
-            btn.innerHTML = open ? '<i class="fas fa-xmark"></i>' : '<i class="fas fa-bars"></i>';
-            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            btn.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
-            const overlay = document.getElementById('sidebarOverlay');
-            if (overlay) overlay.classList.toggle('active', open && isPortraitNav());
+        function updateTabbar(page) {
+            document.querySelectorAll('.gh-tab').forEach(t => t.classList.remove('active'));
+            const activeTab = (page === 'overview' || page === 'deploy') ? 'home'
+                : (page === 'sites' || page === 'detail') ? 'sites'
+                : (page === 'me' || page === 'preferences' || page === 'account') ? 'me'
+                : page;
+            const el = document.querySelector('.gh-tab[data-tab="' + activeTab + '"]');
+            if (el) el.classList.add('active');
+
+            const home = document.getElementById('tabHome');
+            if (!home) return;
+            const onOverview = page === 'overview';
+            home.innerHTML = onOverview
+                ? '<i class="fas fa-rocket" aria-hidden="true"></i><span class="gh-tab-label">部署</span>'
+                : '<i class="fas fa-home" aria-hidden="true"></i><span class="gh-tab-label">首页</span>';
+            home.title = onOverview ? '部署' : '首页';
+            home.setAttribute('aria-label', home.title);
         }
 
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar) sidebar.classList.remove('open');
-            setMenuIcon(false);
+        function loadPlayFrame() {
+            const f = document.getElementById('playFrame');
+            if (f && !f.getAttribute('src') && f.dataset.src) f.setAttribute('src', f.dataset.src);
         }
-
-        /* 三道杠的点击入口：横屏直接短路，不产生任何展开状态 */
-        function toggleSidebar() {
-            if (!isPortraitNav()) return;
-            const sidebar = document.getElementById('sidebar');
-            if (!sidebar) return;
-            const open = !sidebar.classList.contains('open');
-            sidebar.classList.toggle('open', open);
-            setMenuIcon(open);
-        }
-
-        // 兼容旧调用名
-        function toggleSidebarDesktop() { toggleSidebar(); }
-        function toggleSidebarMobile() { toggleSidebar(); }
-
-        // 竖屏下：点击面板外 / 按 ESC 关闭
-        document.addEventListener('click', function (e) {
-            const sidebar = document.getElementById('sidebar');
-            if (!sidebar || !sidebar.classList.contains('open')) return;
-            if (sidebar.contains(e.target)) return;
-            if (e.target.closest && e.target.closest('.menu-toggle')) return;
-            closeSidebar();
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') closeSidebar();
-        });
-
-        // 方向 / 尺寸变化：重新同步模式，并清掉竖屏残留的展开态与遮罩
-        function onNavModeChange() { syncNavMode(); }
-        window.addEventListener('resize', onNavModeChange);
-        window.addEventListener('orientationchange', onNavModeChange);
-        if (NAV_PORTRAIT_MQ.addEventListener) {
-            NAV_PORTRAIT_MQ.addEventListener('change', onNavModeChange);
-        } else if (NAV_PORTRAIT_MQ.addListener) {
-            NAV_PORTRAIT_MQ.addListener(onNavModeChange);
-        }
-        syncNavMode(); // 首屏立即按当前方向初始化
-        document.addEventListener('DOMContentLoaded', syncNavMode); // DOM 就绪后再对齐一次
 
         function showToast(msg, type = 'success') {
             const t = document.getElementById('toast');
@@ -954,13 +897,10 @@
 
         async function showSiteDetail(slug) {
             history.pushState({ page: 'detail', slug }, '', `/dashboard/mysite/${encodeURIComponent(slug)}`);
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            const navSites = document.querySelector('[data-page="sites"]');
-            if (navSites) navSites.classList.add('active');
             document.querySelectorAll('.page').forEach(pp => pp.classList.remove('active'));
             document.getElementById('page-detail').classList.add('active');
             window.scrollTo(0, 0);
-            closeSidebar();
+            updateTabbar('detail');
             document.getElementById('detailPageTitle').textContent = slug;
             document.getElementById('pageDetailBody').innerHTML = '<div class="loading"><svg class="infinity-svg" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg"><path class="infinity-path" d="M 50,50 C 50,20 80,20 100,50 C 120,80 150,80 150,50 C 150,20 120,20 100,50 C 80,80 50,80 50,50 Z" /></svg></div>';
 
@@ -1450,9 +1390,9 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         }
 
-        // 水波纹仅保留在左侧边栏导航项（.nav-item）上，其余按钮不再产生波纹
+        // 水波纹仅保留在底部 tab 按钮上
         document.addEventListener('click', function(e) {
-            const nav = e.target && e.target.closest ? e.target.closest('.nav-item') : null;
+            const nav = e.target && e.target.closest ? e.target.closest('.gh-tab') : null;
             if (nav && !nav.classList.contains('no-ripple')) {
                 createRipple({ currentTarget: nav, clientX: e.clientX, clientY: e.clientY });
             }

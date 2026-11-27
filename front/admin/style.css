@@ -287,6 +287,39 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
     .gh-crumb .gh-crumb-cur { max-width: 140px; }
 }
 
+/* 竖屏表格竖起来 */
+@media (max-width: 640px), (max-width: 900px) and (orientation: portrait) {
+    .gh-content { padding: 12px; }
+    .gh-page-title { font-size: 18px; }
+    .gh-grid-2, .gh-kv { grid-template-columns: minmax(0, 1fr); }
+    .gh-tabs { overflow-x: auto; }
+    .gh-table-wrap { overflow-x: visible; }
+    .gh-table, .gh-table tbody, .gh-table tbody tr, .gh-table td { display: block; }
+    .gh-table colgroup, .gh-table thead { display: none; }
+    .gh-table tbody tr {
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--gh-a-border-soft);
+        border-radius: var(--gh-r);
+        background: var(--gh-a-surface);
+    }
+    .gh-table tbody tr:last-child { margin-bottom: 0; }
+    .gh-table td { padding: 5px 0; border: none; vertical-align: top; }
+    .gh-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: var(--gh-a-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .3px;
+    }
+    .gh-table td:not([data-label])::before { display: none; }
+    .gh-table td.gh-cell-select { width: auto; padding: 0 0 4px; text-align: right; }
+    .gh-table td.gh-cell-actions { padding-top: 8px; text-align: right; white-space: normal; }
+    .gh-table .gh-ellipsis { max-width: none; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+}
+
 /* ==================================================================
  * 只读管理员模式
  *

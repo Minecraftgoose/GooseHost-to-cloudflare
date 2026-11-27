@@ -80,6 +80,16 @@
   Cache-Control: public, max-age=0, must-revalidate
   X-Content-Type-Options: nosniff
 
+/dashboard/playground
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/dashboard/me
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+
 /login
   Content-Type: text/html; charset=utf-8
   X-Content-Type-Options: nosniff
@@ -90,11 +100,33 @@
 
 /playground
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+  ! X-Content-Type-Options
   X-Content-Type-Options: nosniff
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
 
 /playground/
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+  ! X-Content-Type-Options
   X-Content-Type-Options: nosniff
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
+
+/playground/index.html
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+  ! X-Content-Type-Options
+  X-Content-Type-Options: nosniff
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
+
+/playground/*.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+/playground/*.js
+  Cache-Control: public, max-age=0, must-revalidate
 
 /status
   Content-Type: text/html; charset=utf-8

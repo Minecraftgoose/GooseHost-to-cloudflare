@@ -165,8 +165,17 @@
             const cls = isCheck ? 'gh-th-check' : (isActions ? 'gh-th-actions' : '');
             return `<th scope="col"${cls ? ` class="${cls}"` : ''}>${text}</th>`;
         }).join('');
-        return `<div class="gh-table-wrap"><table class="gh-table"><colgroup>${cols}</colgroup>` +
+        const html = `<div class="gh-table-wrap"><table class="gh-table"><colgroup>${cols}</colgroup>` +
             `<thead><tr>${ths}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+        /* 竖屏卡片化时由 CSS 读取这些字段名 */
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const labels = Array.from(doc.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        doc.querySelectorAll('tbody tr').forEach(tr => {
+            Array.from(tr.children).forEach((td, i) => {
+                if (labels[i]) td.setAttribute('data-label', labels[i]);
+            });
+        });
+        return doc.body.innerHTML;
     }
     function siteLink(s) { return s.url || (API_URL + (s.type === 'md' ? '/md/' : s.type === 'project' ? '/p/' : '/s/') + encodeURIComponent(s.name)); }
 
